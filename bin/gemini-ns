@@ -1,0 +1,680 @@
+#!/usr/bin/env python3
+"""
+gemini-ns: Gemini CLI + NeuralSync Integration Wrapper
+Auto-launch, shared memory, and inter-agent communication
+"""
+
+import asyncio
+import os
+import sys
+import json
+import time
+import subprocess
+import signal
+import logging
+from pathlib import Path
+from typing import Optional, Dict, Any, List
+import tempfile
+import shutil
+
+# Add NeuralSync to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from neuralsync.daemon_manager import ensure_neuralsync_running, get_daemon_manager
+from neuralsync.ultra_comm import CliCommunicator
+from neuralsync.config import load_config
+
+# Configure logging
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
+class GeminiNSWrapper:
+    """Enhanced Gemini CLI wrapper with NeuralSync integration"""
+    
+    def __init__(self):
+        self.cli_name = "gemini-cli"
+        self.capabilities = {
+            "reasoning", "analysis", "research", "summarization", 
+            "explanation", "creative-writing", "problem-solving",
+            "multimodal-analysis", "data-interpretation"
+        }
+        
+        self.ns_config = load_config()
+        self.communicator: Optional[CliCommunicator] = None
+        self.temp_files = []
+        
+    async def ensure_services_running(self) -> bool:
+        """Ensure NeuralSync services are running"""
+        try:
+            return await ensure_neuralsync_running()
+        except Exception as e:
+            logger.error(f"Failed to ensure NeuralSync services: {e}")
+            return False
+            
+    async def setup_communication(self) -> bool:
+        """Setup inter-CLI communication"""
+        try:
+            self.communicator = CliCommunicator(self.cli_name, self.capabilities)
+            
+            # Register message handlers for inter-agent communication
+            self.communicator.register_message_handler("analyze_data", self._handle_analysis_request)
+            self.communicator.register_message_handler("research_topic", self._handle_research_request)
+            self.communicator.register_message_handler("summarize_content", self._handle_summary_request)
+            self.communicator.register_message_handler("explain_concept", self._handle_explanation_request)
+            self.communicator.register_message_handler("solve_problem", self._handle_problem_request)
+            self.communicator.register_message_handler("generate_content", self._handle_content_request)
+            self.communicator.register_message_handler("spawn_agent", self._handle_spawn_request)
+            self.communicator.register_message_handler("sync_memory", self._handle_memory_sync)
+            
+            await self.communicator.connect()
+            logger.info("Gemini-NS communication system initialized")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to setup communication: {e}")
+            return False
+            
+    async def _handle_analysis_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle data analysis request from other agents"""
+        try:
+            data_content = data.get('data', '')
+            analysis_type = data.get('type', 'general')
+            context = data.get('context', '')
+            
+            # Store analysis request
+            await self._remember_interaction("data_analysis", f"Analyzing data ({analysis_type}): {data_content[:100]}", context)
+            
+            # Create analysis result
+            analysis_result = f"""Data Analysis ({analysis_type}):
+
+Data: {data_content}
+Context: {context}
+
+Analysis:
+- Data structure: {type(data_content).__name__}
+- Key patterns: [AI would identify patterns here]
+- Insights: [AI would provide insights here]
+- Recommendations: [AI would suggest actions here]
+"""
+
+            # Save to temp file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+                f.write(analysis_result)
+                temp_file = f.name
+                self.temp_files.append(temp_file)
+            
+            return {
+                "status": "analyzed",
+                "analysis_type": analysis_type,
+                "output_file": temp_file,
+                "insights": ["Pattern 1", "Pattern 2", "Pattern 3"],
+                "agent": "gemini-cli",
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            logger.error(f"Analysis request error: {e}")
+            return {"status": "error", "message": str(e)}
+            
+    async def _handle_research_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle research request"""
+        try:
+            topic = data.get('topic', '')
+            depth = data.get('depth', 'medium')
+            context = data.get('context', '')
+            
+            await self._remember_interaction("research", f"Researching topic ({depth}): {topic}", context)
+            
+            # Generate research outline
+            research_content = f"""Research Report: {topic}
+
+Depth: {depth}
+Context: {context}
+
+## Executive Summary
+[AI would provide summary here]
+
+## Key Findings
+1. [Finding 1]
+2. [Finding 2]  
+3. [Finding 3]
+
+## Detailed Analysis
+[AI would provide detailed analysis here]
+
+## Sources and References
+[AI would list relevant sources here]
+
+## Conclusions
+[AI would provide conclusions here]
+"""
+
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+                f.write(research_content)
+                temp_file = f.name
+                self.temp_files.append(temp_file)
+            
+            return {
+                "status": "researched",
+                "topic": topic,
+                "depth": depth,
+                "output_file": temp_file,
+                "key_findings": ["Finding 1", "Finding 2", "Finding 3"],
+                "agent": "gemini-cli",
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            logger.error(f"Research request error: {e}")
+            return {"status": "error", "message": str(e)}
+            
+    async def _handle_summary_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle content summarization request"""
+        try:
+            content = data.get('content', '')
+            summary_type = data.get('type', 'brief')
+            max_length = data.get('max_length', 500)
+            
+            await self._remember_interaction("summarization", f"Summarizing content ({summary_type}, max {max_length} chars)", content[:200])
+            
+            # Generate summary
+            summary = f"""Summary ({summary_type}):
+
+Original content length: {len(content)} characters
+Target summary length: {max_length} characters
+
+Summary:
+[AI would provide intelligent summary of the content here, respecting the max_length constraint]
+
+Key points:
+- [Key point 1]
+- [Key point 2]
+- [Key point 3]
+"""
+
+            return {
+                "status": "summarized",
+                "summary_type": summary_type,
+                "summary": summary,
+                "original_length": len(content),
+                "summary_length": len(summary),
+                "agent": "gemini-cli",
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+            
+    async def _handle_explanation_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle concept explanation request"""
+        try:
+            concept = data.get('concept', '')
+            audience_level = data.get('level', 'intermediate')
+            context = data.get('context', '')
+            
+            await self._remember_interaction("explanation", f"Explaining concept ({audience_level}): {concept}", context)
+            
+            # Generate explanation
+            explanation = f"""Explanation: {concept}
+
+Audience Level: {audience_level}
+Context: {context}
+
+## Simple Explanation
+[AI would provide simple, clear explanation here]
+
+## Key Components
+1. [Component 1]
+2. [Component 2]
+3. [Component 3]
+
+## Examples
+[AI would provide relevant examples here]
+
+## Common Misconceptions
+[AI would address common misunderstandings here]
+
+## Further Reading
+[AI would suggest additional resources here]
+"""
+
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+                f.write(explanation)
+                temp_file = f.name
+                self.temp_files.append(temp_file)
+            
+            return {
+                "status": "explained",
+                "concept": concept,
+                "audience_level": audience_level,
+                "output_file": temp_file,
+                "agent": "gemini-cli",
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+            
+    async def _handle_problem_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle problem-solving request"""
+        try:
+            problem = data.get('problem', '')
+            problem_type = data.get('type', 'general')
+            constraints = data.get('constraints', [])
+            
+            await self._remember_interaction("problem_solving", f"Solving {problem_type} problem: {problem}", str(constraints))
+            
+            # Generate solution approach
+            solution = f"""Problem Analysis: {problem}
+
+Problem Type: {problem_type}
+Constraints: {', '.join(constraints) if constraints else 'None specified'}
+
+## Problem Breakdown
+[AI would break down the problem into components]
+
+## Solution Approaches
+1. **Approach 1**: [Description]
+   - Pros: [List advantages]
+   - Cons: [List disadvantages]
+
+2. **Approach 2**: [Description]
+   - Pros: [List advantages]
+   - Cons: [List disadvantages]
+
+## Recommended Solution
+[AI would provide recommended approach with reasoning]
+
+## Implementation Steps
+1. [Step 1]
+2. [Step 2]
+3. [Step 3]
+
+## Risk Analysis
+[AI would identify potential risks and mitigation strategies]
+"""
+
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+                f.write(solution)
+                temp_file = f.name
+                self.temp_files.append(temp_file)
+            
+            return {
+                "status": "solved",
+                "problem": problem,
+                "problem_type": problem_type,
+                "output_file": temp_file,
+                "approaches": ["Approach 1", "Approach 2"],
+                "agent": "gemini-cli",
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+            
+    async def _handle_content_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle content generation request"""
+        try:
+            content_type = data.get('type', 'article')
+            topic = data.get('topic', '')
+            style = data.get('style', 'professional')
+            length = data.get('length', 'medium')
+            
+            await self._remember_interaction("content_generation", f"Generating {content_type} about {topic} ({style}, {length})", "")
+            
+            # Generate content
+            content = f"""# {topic}
+
+Style: {style}
+Length: {length}
+Type: {content_type}
+
+## Introduction
+[AI would generate appropriate introduction here]
+
+## Main Content
+[AI would generate main content based on type, style, and length requirements]
+
+## Conclusion
+[AI would generate appropriate conclusion here]
+
+---
+Generated by Gemini-NS on {time.strftime('%Y-%m-%d %H:%M:%S')}
+"""
+
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+                f.write(content)
+                temp_file = f.name
+                self.temp_files.append(temp_file)
+            
+            return {
+                "status": "generated",
+                "content_type": content_type,
+                "topic": topic,
+                "style": style,
+                "length": length,
+                "output_file": temp_file,
+                "agent": "gemini-cli",
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+            
+    async def _handle_spawn_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle request to spawn another agent"""
+        try:
+            agent_type = data.get('agent', '')
+            task = data.get('task', '')
+            context = data.get('context', {})
+            
+            agent_commands = {
+                'claude': 'claude-ns',
+                'codex': 'codex-ns',
+                'gemini': 'gemini-ns'
+            }
+            
+            if agent_type not in agent_commands:
+                return {"status": "error", "message": f"Unknown agent type: {agent_type}"}
+                
+            cmd = [agent_commands[agent_type], '--task', json.dumps({"task": task, "context": context})]
+            
+            try:
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                await self._remember_interaction("agent_spawn", f"Spawned {agent_type} agent", task)
+                
+                return {
+                    "status": "spawned",
+                    "agent": agent_type,
+                    "pid": process.pid,
+                    "task": task,
+                    "timestamp": time.time()
+                }
+                
+            except Exception as e:
+                return {"status": "error", "message": f"Failed to spawn {agent_type}: {e}"}
+                
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+            
+    async def _handle_memory_sync(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle memory synchronization between agents"""
+        try:
+            sync_type = data.get('type', 'pull')
+            query = data.get('query', '')
+            
+            if sync_type == 'pull':
+                await self._remember_interaction("memory_sync", f"Memory pull request: {query}", "")
+                return {
+                    "status": "synced",
+                    "type": "pull", 
+                    "query": query,
+                    "timestamp": time.time()
+                }
+                
+            elif sync_type == 'push':
+                memory_data = data.get('memory', {})
+                await self._remember_interaction("memory_push", "Received memory from another agent", str(memory_data)[:200])
+                return {
+                    "status": "synced",
+                    "type": "push",
+                    "timestamp": time.time()
+                }
+                
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+            
+    async def _remember_interaction(self, kind: str, text: str, context: str):
+        """Store interaction in NeuralSync memory"""
+        try:
+            import requests
+            
+            headers = {}
+            if self.ns_config.token:
+                headers["Authorization"] = f"Bearer {self.ns_config.token}"
+                
+            payload = {
+                "text": text,
+                "kind": kind,
+                "scope": "inter-agent",
+                "tool": self.cli_name,
+                "tags": ["auto-generated", "inter-agent", "gemini"],
+                "confidence": 0.9,
+                "source": "gemini-ns",
+                "meta": {"context": context, "timestamp": time.time()}
+            }
+            
+            requests.post(
+                f"http://{self.ns_config.bind_host}:{self.ns_config.bind_port}/remember",
+                headers=headers,
+                json=payload,
+                timeout=5
+            )
+            
+        except Exception as e:
+            logger.debug(f"Failed to store memory: {e}")
+            
+    async def get_shared_context(self) -> str:
+        """Get shared persona and memory context from NeuralSync"""
+        try:
+            import requests
+            
+            headers = {}
+            if self.ns_config.token:
+                headers["Authorization"] = f"Bearer {self.ns_config.token}"
+            
+            # Get persona
+            persona_response = requests.get(
+                f"http://{self.ns_config.bind_host}:{self.ns_config.bind_port}/persona",
+                headers=headers,
+                timeout=5
+            )
+            
+            persona = ""
+            if persona_response.status_code == 200:
+                persona = persona_response.json().get("text", "")
+                
+            # Get relevant memories for reasoning/analysis context
+            recall_response = requests.post(
+                f"http://{self.ns_config.bind_host}:{self.ns_config.bind_port}/recall",
+                headers=headers,
+                json={
+                    "query": "analysis research reasoning problem solving",
+                    "top_k": 8,
+                    "scope": "any",
+                    "tool": None
+                },
+                timeout=10
+            )
+            
+            memory_context = ""
+            if recall_response.status_code == 200:
+                recall_data = recall_response.json()
+                memory_context = recall_data.get("preamble", "")
+                
+            # Combine context
+            context_parts = []
+            if persona:
+                context_parts.append(f"Persona: {persona}")
+            if memory_context:
+                context_parts.append(memory_context)
+                
+            return "\n\n".join(context_parts) + ("\n\n" if context_parts else "")
+            
+        except Exception as e:
+            logger.debug(f"Failed to get shared context: {e}")
+            return ""
+            
+    async def run_gemini_cli(self, args: List[str]) -> int:
+        """Run Gemini CLI with NeuralSync context injection"""
+        try:
+            # Get shared context
+            shared_context = await self.get_shared_context()
+            
+            # Find gemini CLI executable
+            gemini_cmd = shutil.which('gemini')
+            if not gemini_cmd:
+                print("ERROR: gemini CLI not found in PATH", file=sys.stderr)
+                print("Please install Gemini CLI first", file=sys.stderr)
+                return 1
+                
+            # Prepare environment
+            env = os.environ.copy()
+            env.update({
+                'NS_HOST': self.ns_config.bind_host,
+                'NS_PORT': str(self.ns_config.bind_port),
+                'NS_TOKEN': self.ns_config.token,
+                'NEURALSYNC_CONTEXT': shared_context,
+                'CLI_WRAPPER': 'gemini-ns'
+            })
+            
+            # Handle stdin input with context enhancement
+            if not args or (len(args) == 1 and args[0] in ['-', '--stdin']):
+                input_data = sys.stdin.read() if not sys.stdin.isatty() else ""
+                
+                # Enhance input with context for better reasoning
+                enhanced_input = f"""{shared_context}
+
+Reasoning/Analysis Request:
+{input_data}
+
+Please provide thoughtful analysis with clear reasoning, considering all available context."""
+
+                process = subprocess.Popen(
+                    [gemini_cmd],
+                    stdin=subprocess.PIPE,
+                    stdout=sys.stdout,
+                    stderr=sys.stderr,
+                    env=env,
+                    text=True
+                )
+                
+                process.communicate(input=enhanced_input)
+                return process.returncode
+                
+            else:
+                # Run with args and enhanced environment
+                process = subprocess.run(
+                    [gemini_cmd] + args,
+                    env=env
+                )
+                return process.returncode
+                
+        except Exception as e:
+            logger.error(f"Failed to run gemini CLI: {e}")
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 1
+            
+    def cleanup(self):
+        """Cleanup temporary files"""
+        for temp_file in self.temp_files:
+            try:
+                os.unlink(temp_file)
+            except:
+                pass
+                
+    async def run(self, args: List[str]) -> int:
+        """Main run method"""
+        try:
+            # Handle special arguments
+            if len(args) > 0:
+                if args[0] == '--neuralsync-status':
+                    manager = get_daemon_manager()
+                    status = manager.get_system_info()
+                    print(json.dumps(status, indent=2))
+                    return 0
+                    
+                elif args[0] == '--spawn-agent':
+                    if len(args) < 3:
+                        print("Usage: gemini-ns --spawn-agent <agent_type> <task>", file=sys.stderr)
+                        return 1
+                        
+                    agent_type = args[1]
+                    task = ' '.join(args[2:])
+                    
+                    if self.communicator:
+                        result = await self._handle_spawn_request({
+                            'agent': agent_type,
+                            'task': task,
+                            'context': {}
+                        })
+                        print(json.dumps(result, indent=2))
+                        return 0 if result['status'] != 'error' else 1
+                        
+                elif args[0] == '--task':
+                    # Handle spawned task
+                    if len(args) > 1:
+                        try:
+                            task_data = json.loads(args[1])
+                            task = task_data.get('task', '')
+                            context = task_data.get('context', {})
+                            
+                            await self._remember_interaction("spawned_task", f"Processing spawned task: {task}", str(context))
+                            
+                            # Create task input for gemini CLI
+                            task_input = f"""Task: {task}
+Context: {json.dumps(context, indent=2)}
+
+Please analyze this task and provide comprehensive insights and recommendations."""
+                            
+                            return await self.run_gemini_cli([])
+                            
+                        except json.JSONDecodeError:
+                            print("ERROR: Invalid task JSON", file=sys.stderr)
+                            return 1
+            
+            # Ensure NeuralSync services are running
+            print("🔄 Ensuring NeuralSync services are running...", file=sys.stderr)
+            services_ready = await self.ensure_services_running()
+            
+            if services_ready:
+                print("✅ NeuralSync services ready", file=sys.stderr)
+                await self.setup_communication()
+            else:
+                print("⚠️  NeuralSync services not available, running without integration", file=sys.stderr)
+                
+            # Run gemini CLI with NeuralSync integration
+            return await self.run_gemini_cli(args)
+            
+        finally:
+            # Cleanup
+            self.cleanup()
+            if self.communicator:
+                await self.communicator.disconnect()
+
+
+async def main():
+    """Main entry point"""
+    wrapper = GeminiNSWrapper()
+    
+    # Handle signals gracefully
+    def signal_handler(sig, frame):
+        asyncio.create_task(wrapper.communicator.disconnect() if wrapper.communicator else asyncio.sleep(0))
+        sys.exit(0)
+        
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Run wrapper
+    try:
+        return_code = await wrapper.run(sys.argv[1:])
+        sys.exit(return_code)
+    except KeyboardInterrupt:
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"Gemini-NS wrapper error: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

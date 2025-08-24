@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 import os, sys, shlex, subprocess, requests
+from typing import Optional
 
 NS = os.environ.get("NS_ENDPOINT", f"http://{os.environ.get('NS_HOST','127.0.0.1')}:{os.environ.get('NS_PORT','8373')}")
 HEAD = {"Authorization": f"Bearer {os.environ['NS_TOKEN']}"} if os.environ.get("NS_TOKEN") else {}
 
-def get_preamble(tool: str|None):
+def get_preamble(tool: Optional[str]):
     persona = requests.get(f"{NS}/persona", headers=HEAD, timeout=5).json().get("text","")
     recall = requests.post(f"{NS}/recall", headers=HEAD, json={"query":"", "top_k":8, "scope":"any", "tool":tool}, timeout=10).json()
     pre = []

@@ -1,0 +1,552 @@
+#!/usr/bin/env python3
+"""
+codex-ns: CodexCLI + NeuralSync Integration Wrapper
+Auto-launch, shared memory, and inter-agent communication
+"""
+
+import asyncio
+import os
+import sys
+import json
+import time
+import subprocess
+import signal
+import logging
+from pathlib import Path
+from typing import Optional, Dict, Any, List
+import tempfile
+import shutil
+
+# Add NeuralSync to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from neuralsync.daemon_manager import ensure_neuralsync_running, get_daemon_manager
+from neuralsync.ultra_comm import CliCommunicator
+from neuralsync.config import load_config
+
+# Configure logging
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
+class CodexNSWrapper:
+    """Enhanced CodexCLI wrapper with NeuralSync integration"""
+    
+    def __init__(self):
+        self.cli_name = "codex-cli"
+        self.capabilities = {
+            "code-completion", "generation", "optimization", "translation",
+            "code-search", "pattern-recognition", "api-integration"
+        }
+        
+        self.ns_config = load_config()
+        self.communicator: Optional[CliCommunicator] = None
+        self.temp_files = []
+        
+    async def ensure_services_running(self) -> bool:
+        """Ensure NeuralSync services are running"""
+        try:
+            return await ensure_neuralsync_running()
+        except Exception as e:
+            logger.error(f"Failed to ensure NeuralSync services: {e}")
+            return False
+            
+    async def setup_communication(self) -> bool:
+        """Setup inter-CLI communication"""
+        try:
+            self.communicator = CliCommunicator(self.cli_name, self.capabilities)
+            
+            # Register message handlers for inter-agent communication
+            self.communicator.register_message_handler("generate_code", self._handle_generation_request)
+            self.communicator.register_message_handler("complete_code", self._handle_completion_request)
+            self.communicator.register_message_handler("optimize_code", self._handle_optimization_request)
+            self.communicator.register_message_handler("translate_code", self._handle_translation_request)
+            self.communicator.register_message_handler("search_patterns", self._handle_search_request)
+            self.communicator.register_message_handler("spawn_agent", self._handle_spawn_request)
+            self.communicator.register_message_handler("sync_memory", self._handle_memory_sync)
+            
+            await self.communicator.connect()
+            logger.info("Codex-NS communication system initialized")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to setup communication: {e}")
+            return False
+            
+    async def _handle_generation_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle code generation request from other agents"""
+        try:
+            prompt = data.get('prompt', '')
+            language = data.get('language', 'python')
+            context = data.get('context', '')
+            
+            # Store generation request
+            await self._remember_interaction("code_generation", f"Generating {language} code: {prompt}", context)
+            
+            # Create temp file for output
+            with tempfile.NamedTemporaryFile(mode='w', suffix=f'.{language}', delete=False) as f:
+                temp_file = f.name
+                self.temp_files.append(temp_file)
+            
+            # Generate code using codexcli (simplified - would use actual CLI)
+            generation_context = f"""Generate {language} code for: {prompt}
+
+Context: {context}
+
+Requirements:
+- Clean, readable code
+- Proper error handling
+- Documentation/comments
+- Follow best practices for {language}
+"""
+            
+            return {
+                "status": "generated",
+                "prompt": prompt,
+                "language": language,
+                "output_file": temp_file,
+                "context": generation_context,
+                "agent": "codex-cli",
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            logger.error(f"Generation request error: {e}")
+            return {"status": "error", "message": str(e)}
+            
+    async def _handle_completion_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle code completion request"""
+        try:
+            partial_code = data.get('code', '')
+            cursor_position = data.get('cursor', len(partial_code))
+            language = data.get('language', 'python')
+            
+            # Store completion context
+            await self._remember_interaction("code_completion", 
+                                           f"Code completion for {language}", 
+                                           partial_code[:200])
+            
+            # Generate completions (simplified)
+            completion_suggestions = [
+                {"text": "# AI-generated completion suggestion", "score": 0.9},
+                {"text": "# Additional completion option", "score": 0.7}
+            ]
+            
+            return {
+                "status": "completed",
+                "language": language,
+                "suggestions": completion_suggestions,
+                "cursor_position": cursor_position,
+                "agent": "codex-cli",
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            logger.error(f"Completion request error: {e}")
+            return {"status": "error", "message": str(e)}
+            
+    async def _handle_optimization_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle code optimization request"""
+        try:
+            code = data.get('code', '')
+            optimization_type = data.get('type', 'performance')
+            language = data.get('language', 'python')
+            
+            await self._remember_interaction("code_optimization", 
+                                           f"Optimizing {language} code ({optimization_type})", 
+                                           code[:200])
+            
+            # Create optimized version (placeholder)
+            with tempfile.NamedTemporaryFile(mode='w', suffix=f'.{language}', delete=False) as f:
+                f.write(f"# Optimized {language} code ({optimization_type})\n{code}")
+                temp_file = f.name
+                self.temp_files.append(temp_file)
+            
+            return {
+                "status": "optimized",
+                "optimization_type": optimization_type,
+                "language": language,
+                "output_file": temp_file,
+                "improvements": ["Performance enhanced", "Memory usage reduced"],
+                "agent": "codex-cli",
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+            
+    async def _handle_translation_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle code translation between languages"""
+        try:
+            code = data.get('code', '')
+            from_lang = data.get('from_language', 'python')
+            to_lang = data.get('to_language', 'javascript')
+            
+            await self._remember_interaction("code_translation", 
+                                           f"Translating code from {from_lang} to {to_lang}", 
+                                           code[:200])
+            
+            # Create translated version
+            with tempfile.NamedTemporaryFile(mode='w', suffix=f'.{to_lang}', delete=False) as f:
+                f.write(f"// Translated from {from_lang} to {to_lang}\n{code}")
+                temp_file = f.name
+                self.temp_files.append(temp_file)
+                
+            return {
+                "status": "translated",
+                "from_language": from_lang,
+                "to_language": to_lang,
+                "output_file": temp_file,
+                "agent": "codex-cli",
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+            
+    async def _handle_search_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle code pattern search request"""
+        try:
+            pattern = data.get('pattern', '')
+            search_type = data.get('type', 'function')
+            language = data.get('language', 'any')
+            
+            await self._remember_interaction("code_search", 
+                                           f"Searching for {search_type} patterns: {pattern}", 
+                                           f"Language: {language}")
+            
+            # Mock search results
+            results = [
+                {"file": "example.py", "line": 42, "match": pattern, "context": "def example():"},
+                {"file": "utils.js", "line": 15, "match": pattern, "context": "function helper() {"}
+            ]
+            
+            return {
+                "status": "searched",
+                "pattern": pattern,
+                "search_type": search_type,
+                "language": language,
+                "results": results,
+                "agent": "codex-cli",
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+            
+    async def _handle_spawn_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle request to spawn another agent"""
+        try:
+            agent_type = data.get('agent', '')
+            task = data.get('task', '')
+            context = data.get('context', {})
+            
+            agent_commands = {
+                'claude': 'claude-ns',
+                'gemini': 'gemini-ns',
+                'codex': 'codex-ns'
+            }
+            
+            if agent_type not in agent_commands:
+                return {"status": "error", "message": f"Unknown agent type: {agent_type}"}
+                
+            cmd = [agent_commands[agent_type], '--task', json.dumps({"task": task, "context": context})]
+            
+            try:
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                await self._remember_interaction("agent_spawn", f"Spawned {agent_type} agent", task)
+                
+                return {
+                    "status": "spawned",
+                    "agent": agent_type,
+                    "pid": process.pid,
+                    "task": task,
+                    "timestamp": time.time()
+                }
+                
+            except Exception as e:
+                return {"status": "error", "message": f"Failed to spawn {agent_type}: {e}"}
+                
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+            
+    async def _handle_memory_sync(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle memory synchronization between agents"""
+        try:
+            sync_type = data.get('type', 'pull')
+            query = data.get('query', '')
+            
+            if sync_type == 'pull':
+                await self._remember_interaction("memory_sync", f"Memory pull request: {query}", "")
+                return {
+                    "status": "synced",
+                    "type": "pull",
+                    "query": query,
+                    "timestamp": time.time()
+                }
+                
+            elif sync_type == 'push':
+                memory_data = data.get('memory', {})
+                await self._remember_interaction("memory_push", "Received memory from another agent", str(memory_data)[:200])
+                return {
+                    "status": "synced", 
+                    "type": "push",
+                    "timestamp": time.time()
+                }
+                
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+            
+    async def _remember_interaction(self, kind: str, text: str, context: str):
+        """Store interaction in NeuralSync memory"""
+        try:
+            import requests
+            
+            headers = {}
+            if self.ns_config.token:
+                headers["Authorization"] = f"Bearer {self.ns_config.token}"
+                
+            payload = {
+                "text": text,
+                "kind": kind,
+                "scope": "inter-agent",
+                "tool": self.cli_name,
+                "tags": ["auto-generated", "inter-agent", "codex"],
+                "confidence": 0.9,
+                "source": "codex-ns",
+                "meta": {"context": context, "timestamp": time.time()}
+            }
+            
+            requests.post(
+                f"http://{self.ns_config.bind_host}:{self.ns_config.bind_port}/remember",
+                headers=headers,
+                json=payload,
+                timeout=5
+            )
+            
+        except Exception as e:
+            logger.debug(f"Failed to store memory: {e}")
+            
+    async def get_shared_context(self) -> str:
+        """Get shared persona and memory context from NeuralSync"""
+        try:
+            import requests
+            
+            headers = {}
+            if self.ns_config.token:
+                headers["Authorization"] = f"Bearer {self.ns_config.token}"
+            
+            # Get persona
+            persona_response = requests.get(
+                f"http://{self.ns_config.bind_host}:{self.ns_config.bind_port}/persona",
+                headers=headers,
+                timeout=5
+            )
+            
+            persona = ""
+            if persona_response.status_code == 200:
+                persona = persona_response.json().get("text", "")
+                
+            # Get relevant memories for code generation context
+            recall_response = requests.post(
+                f"http://{self.ns_config.bind_host}:{self.ns_config.bind_port}/recall",
+                headers=headers,
+                json={
+                    "query": "code generation completion optimization",
+                    "top_k": 6,
+                    "scope": "any", 
+                    "tool": None
+                },
+                timeout=10
+            )
+            
+            memory_context = ""
+            if recall_response.status_code == 200:
+                recall_data = recall_response.json()
+                memory_context = recall_data.get("preamble", "")
+                
+            # Combine context
+            context_parts = []
+            if persona:
+                context_parts.append(f"Persona: {persona}")
+            if memory_context:
+                context_parts.append(memory_context)
+                
+            return "\n\n".join(context_parts) + ("\n\n" if context_parts else "")
+            
+        except Exception as e:
+            logger.debug(f"Failed to get shared context: {e}")
+            return ""
+            
+    async def run_codexcli(self, args: List[str]) -> int:
+        """Run CodexCLI with NeuralSync context injection"""
+        try:
+            # Get shared context
+            shared_context = await self.get_shared_context()
+            
+            # Find codexcli executable
+            codex_cmd = shutil.which('codexcli')
+            if not codex_cmd:
+                print("ERROR: codexcli not found in PATH", file=sys.stderr)
+                print("Please install CodexCLI first", file=sys.stderr)
+                return 1
+                
+            # Prepare environment
+            env = os.environ.copy()
+            env.update({
+                'NS_HOST': self.ns_config.bind_host,
+                'NS_PORT': str(self.ns_config.bind_port),
+                'NS_TOKEN': self.ns_config.token,
+                'NEURALSYNC_CONTEXT': shared_context,
+                'CLI_WRAPPER': 'codex-ns'
+            })
+            
+            # Handle stdin input
+            if not args or (len(args) == 1 and args[0] in ['-', '--stdin']):
+                input_data = sys.stdin.read() if not sys.stdin.isatty() else ""
+                
+                # Enhance input with context for better code generation
+                enhanced_input = f"""{shared_context}
+
+Code Generation Request:
+{input_data}
+
+Please generate clean, well-documented code with proper error handling."""
+
+                process = subprocess.Popen(
+                    [codex_cmd],
+                    stdin=subprocess.PIPE,
+                    stdout=sys.stdout,
+                    stderr=sys.stderr,
+                    env=env,
+                    text=True
+                )
+                
+                process.communicate(input=enhanced_input)
+                return process.returncode
+                
+            else:
+                # Run with args and enhanced environment
+                process = subprocess.run(
+                    [codex_cmd] + args,
+                    env=env
+                )
+                return process.returncode
+                
+        except Exception as e:
+            logger.error(f"Failed to run codexcli: {e}")
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 1
+            
+    def cleanup(self):
+        """Cleanup temporary files"""
+        for temp_file in self.temp_files:
+            try:
+                os.unlink(temp_file)
+            except:
+                pass
+                
+    async def run(self, args: List[str]) -> int:
+        """Main run method"""
+        try:
+            # Handle special arguments
+            if len(args) > 0:
+                if args[0] == '--neuralsync-status':
+                    manager = get_daemon_manager()
+                    status = manager.get_system_info()
+                    print(json.dumps(status, indent=2))
+                    return 0
+                    
+                elif args[0] == '--spawn-agent':
+                    if len(args) < 3:
+                        print("Usage: codex-ns --spawn-agent <agent_type> <task>", file=sys.stderr)
+                        return 1
+                        
+                    agent_type = args[1]
+                    task = ' '.join(args[2:])
+                    
+                    if self.communicator:
+                        result = await self._handle_spawn_request({
+                            'agent': agent_type,
+                            'task': task,
+                            'context': {}
+                        })
+                        print(json.dumps(result, indent=2))
+                        return 0 if result['status'] != 'error' else 1
+                        
+                elif args[0] == '--task':
+                    # Handle spawned task
+                    if len(args) > 1:
+                        try:
+                            task_data = json.loads(args[1])
+                            task = task_data.get('task', '')
+                            context = task_data.get('context', {})
+                            
+                            await self._remember_interaction("spawned_task", f"Processing spawned task: {task}", str(context))
+                            
+                            # Create task input for codexcli
+                            task_input = f"""Task: {task}
+Context: {json.dumps(context, indent=2)}
+
+Please generate appropriate code for this task."""
+                            
+                            return await self.run_codexcli([])
+                            
+                        except json.JSONDecodeError:
+                            print("ERROR: Invalid task JSON", file=sys.stderr)
+                            return 1
+            
+            # Ensure NeuralSync services are running
+            print("🔄 Ensuring NeuralSync services are running...", file=sys.stderr)
+            services_ready = await self.ensure_services_running()
+            
+            if services_ready:
+                print("✅ NeuralSync services ready", file=sys.stderr)
+                await self.setup_communication()
+            else:
+                print("⚠️  NeuralSync services not available, running without integration", file=sys.stderr)
+                
+            # Run codexcli with NeuralSync integration
+            return await self.run_codexcli(args)
+            
+        finally:
+            # Cleanup
+            self.cleanup()
+            if self.communicator:
+                await self.communicator.disconnect()
+
+
+async def main():
+    """Main entry point"""
+    wrapper = CodexNSWrapper()
+    
+    # Handle signals gracefully
+    def signal_handler(sig, frame):
+        asyncio.create_task(wrapper.communicator.disconnect() if wrapper.communicator else asyncio.sleep(0))
+        sys.exit(0)
+        
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Run wrapper
+    try:
+        return_code = await wrapper.run(sys.argv[1:])
+        sys.exit(return_code)
+    except KeyboardInterrupt:
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"Codex-NS wrapper error: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

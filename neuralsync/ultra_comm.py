@@ -10,11 +10,51 @@ import time
 import uuid
 import struct
 from pathlib import Path
-from typing import Dict, Set, Optional, Callable, Any
+from typing import Dict, Set, Optional, Callable, Any, Union
 from dataclasses import dataclass, asdict
+from enum import Enum
 import socket
 import pickle
 from concurrent.futures import ThreadPoolExecutor
+
+
+class MessageTypes(Enum):
+    """Enhanced message types for inter-agent communication"""
+    # Core system messages
+    REGISTER = "register"
+    HEARTBEAT = "heartbeat"
+    DISCOVERY = "discovery"
+    ROUTE = "route"
+    BROADCAST = "broadcast"
+    ACK = "ack"
+    
+    # Memory and data synchronization
+    MEMORY_STORE = "memory_store"
+    MEMORY_RECALL = "memory_recall"
+    MEMORY_SYNC = "memory_sync"
+    PERSONALITY_UPDATE = "personality_update"
+    SYNC_RESPONSE = "sync_response"
+    
+    # Agent coordination
+    AGENT_SPAWN = "agent_spawn"
+    AGENT_STATUS = "agent_status"
+    TASK_DELEGATE = "task_delegate"
+    TASK_COMPLETE = "task_complete"
+    
+    # Specialized capabilities
+    CODE_ANALYZE = "code_analyze"
+    CODE_GENERATE = "code_generate"
+    CODE_REVIEW = "code_review"
+    CODE_REFACTOR = "code_refactor"
+    RESEARCH_REQUEST = "research_request"
+    CONTENT_GENERATE = "content_generate"
+    PROBLEM_SOLVE = "problem_solve"
+    
+    # Security and unleashed mode
+    UNLEASHED_MODE = "unleashed_mode"
+    SECURITY_ALERT = "security_alert"
+    EMERGENCY_SHUTDOWN = "emergency_shutdown"
+
 
 @dataclass
 class Message:
@@ -607,6 +647,237 @@ async def start_message_broker():
     except KeyboardInterrupt:
         print("🛑 Shutting down message broker...")
         await broker.stop()
+
+class CommunicationManager:
+    """High-level communication manager for NeuralSync agents"""
+    
+    def __init__(self):
+        self.message_broker: Optional[MessageBroker] = None
+        self.communicators: Dict[str, CliCommunicator] = {}
+        self.message_handlers: Dict[str, Callable] = {}
+        self.running = False
+        
+    async def start_system(self):
+        """Start the complete communication system"""
+        try:
+            # Start message broker
+            self.message_broker = MessageBroker()
+            await self.message_broker.start()
+            
+            # Register global message handlers
+            self._register_global_handlers()
+            
+            self.running = True
+            logger.info("🚀 NeuralSync Communication System started")
+            
+        except Exception as e:
+            logger.error(f"Failed to start communication system: {e}")
+            raise
+            
+    async def stop_system(self):
+        """Stop the complete communication system"""
+        self.running = False
+        
+        # Disconnect all communicators
+        for communicator in self.communicators.values():
+            await communicator.disconnect()
+            
+        # Stop message broker
+        if self.message_broker:
+            await self.message_broker.stop()
+            
+        logger.info("🛑 NeuralSync Communication System stopped")
+        
+    def _register_global_handlers(self):
+        """Register global message handlers"""
+        
+        async def handle_agent_coordination(message):
+            """Handle agent coordination messages"""
+            try:
+                msg_type = message.get('type')
+                payload = message.get('payload', {})
+                
+                if msg_type == MessageTypes.AGENT_SPAWN.value:
+                    await self._handle_agent_spawn(message.get('source'), payload)
+                elif msg_type == MessageTypes.TASK_DELEGATE.value:
+                    await self._handle_task_delegation(message.get('source'), payload)
+                elif msg_type == MessageTypes.AGENT_STATUS.value:
+                    await self._handle_agent_status_request(message.get('source'), payload)
+                    
+            except Exception as e:
+                logger.error(f"Agent coordination error: {e}")
+                
+        async def handle_security_messages(message):
+            """Handle security-related messages"""
+            try:
+                msg_type = message.get('type')
+                payload = message.get('payload', {})
+                
+                if msg_type == MessageTypes.SECURITY_ALERT.value:
+                    await self._handle_security_alert(message.get('source'), payload)
+                elif msg_type == MessageTypes.EMERGENCY_SHUTDOWN.value:
+                    await self._handle_emergency_shutdown(message.get('source'), payload)
+                    
+            except Exception as e:
+                logger.error(f"Security message error: {e}")
+                
+        # Register handlers with broker
+        if self.message_broker:
+            self.message_broker.message_handlers.update({
+                'agent_coordination': handle_agent_coordination,
+                'security': handle_security_messages
+            })
+            
+    async def _handle_agent_spawn(self, source: str, payload: Dict[str, Any]):
+        """Handle agent spawn request"""
+        agent_type = payload.get('agent_type')
+        task_description = payload.get('task')
+        context = payload.get('context', {})
+        
+        logger.info(f"Agent spawn request from {source}: {agent_type} for task '{task_description}'")
+        
+        # Implementation would spawn the requested agent
+        # For now, log the request
+        
+    async def _handle_task_delegation(self, source: str, payload: Dict[str, Any]):
+        """Handle task delegation between agents"""
+        target_agent = payload.get('target_agent')
+        task_type = payload.get('task_type')
+        task_data = payload.get('task_data', {})
+        
+        logger.info(f"Task delegation from {source} to {target_agent}: {task_type}")
+        
+        # Forward task to target agent if connected
+        if target_agent in self.communicators:
+            communicator = self.communicators[target_agent]
+            await communicator.send_message(target_agent, MessageTypes.TASK_DELEGATE.value, {
+                'task_type': task_type,
+                'task_data': task_data,
+                'delegated_by': source,
+                'timestamp': time.time()
+            })
+            
+    async def _handle_agent_status_request(self, source: str, payload: Dict[str, Any]):
+        """Handle agent status request"""
+        logger.info(f"Agent status request from {source}")
+        
+        # Collect status from all connected agents
+        status_info = {
+            'connected_agents': list(self.communicators.keys()),
+            'system_running': self.running,
+            'timestamp': time.time()
+        }
+        
+        # Send response back to source
+        if source in self.communicators:
+            communicator = self.communicators[source]
+            await communicator.send_message(source, MessageTypes.AGENT_STATUS.value, status_info)
+            
+    async def _handle_security_alert(self, source: str, payload: Dict[str, Any]):
+        """Handle security alert"""
+        alert_level = payload.get('level', 'medium')
+        alert_message = payload.get('message', '')
+        
+        logger.warning(f"🚨 Security alert from {source} ({alert_level}): {alert_message}")
+        
+        # Broadcast to all agents if high severity
+        if alert_level in ['high', 'critical']:
+            for communicator in self.communicators.values():
+                await communicator.broadcast_message(MessageTypes.SECURITY_ALERT.value, payload)
+                
+    async def _handle_emergency_shutdown(self, source: str, payload: Dict[str, Any]):
+        """Handle emergency shutdown request"""
+        reason = payload.get('reason', 'Unknown')
+        
+        logger.critical(f"🚨 Emergency shutdown requested by {source}: {reason}")
+        
+        # Initiate emergency shutdown
+        await self.stop_system()
+        
+    async def register_agent(self, agent_name: str, capabilities: Set[str]) -> CliCommunicator:
+        """Register a new agent with the communication system"""
+        try:
+            communicator = CliCommunicator(agent_name, capabilities)
+            await communicator.connect()
+            
+            self.communicators[agent_name] = communicator
+            logger.info(f"✅ Registered agent: {agent_name} with capabilities: {capabilities}")
+            
+            return communicator
+            
+        except Exception as e:
+            logger.error(f"Failed to register agent {agent_name}: {e}")
+            raise
+            
+    async def unregister_agent(self, agent_name: str):
+        """Unregister an agent from the communication system"""
+        if agent_name in self.communicators:
+            communicator = self.communicators[agent_name]
+            await communicator.disconnect()
+            del self.communicators[agent_name]
+            logger.info(f"❌ Unregistered agent: {agent_name}")
+            
+    def get_connected_agents(self) -> List[str]:
+        """Get list of currently connected agents"""
+        return list(self.communicators.keys())
+        
+    def get_agent_capabilities(self, agent_name: str) -> Set[str]:
+        """Get capabilities of a specific agent"""
+        if agent_name in self.communicators:
+            return self.communicators[agent_name].capabilities
+        return set()
+        
+    async def broadcast_to_agents(self, message_type: str, payload: Dict[str, Any], exclude: Set[str] = None):
+        """Broadcast message to all connected agents"""
+        exclude = exclude or set()
+        
+        for agent_name, communicator in self.communicators.items():
+            if agent_name not in exclude:
+                try:
+                    await communicator.broadcast_message(message_type, payload)
+                except Exception as e:
+                    logger.error(f"Failed to broadcast to {agent_name}: {e}")
+                    
+    def get_system_stats(self) -> Dict[str, Any]:
+        """Get comprehensive communication system statistics"""
+        return {
+            'running': self.running,
+            'connected_agents': len(self.communicators),
+            'agent_details': {
+                name: {
+                    'capabilities': list(comm.capabilities),
+                    'connected': True
+                }
+                for name, comm in self.communicators.items()
+            },
+            'broker_active': self.message_broker is not None and hasattr(self.message_broker, 'running') and self.message_broker.running,
+            'timestamp': time.time()
+        }
+
+
+# Global communication manager instance
+_comm_manager: Optional[CommunicationManager] = None
+
+
+def get_comm_manager(site_id: str = None) -> CommunicationManager:
+    """Get singleton communication manager instance"""
+    global _comm_manager
+    if _comm_manager is None:
+        _comm_manager = CommunicationManager()
+    return _comm_manager
+
+
+async def ensure_communication_system() -> bool:
+    """Ensure the communication system is running"""
+    try:
+        manager = get_comm_manager()
+        if not manager.running:
+            await manager.start_system()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to ensure communication system: {e}")
+        return False
+
 
 if __name__ == "__main__":
     asyncio.run(start_message_broker())
