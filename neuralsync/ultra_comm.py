@@ -10,7 +10,7 @@ import time
 import uuid
 import struct
 from pathlib import Path
-from typing import Dict, Set, Optional, Callable, Any, Union
+from typing import Dict, Set, Optional, Callable, Any, Union, List
 from dataclasses import dataclass, asdict
 from enum import Enum
 import socket
