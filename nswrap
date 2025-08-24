@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+import os, sys, shlex, subprocess, requests
+
+NS = os.environ.get("NS_ENDPOINT", f"http://{os.environ.get('NS_HOST','127.0.0.1')}:{os.environ.get('NS_PORT','8373')}")
+HEAD = {"Authorization": f"Bearer {os.environ['NS_TOKEN']}"} if os.environ.get("NS_TOKEN") else {}
+
+def get_preamble(tool: str|None):
+    persona = requests.get(f"{NS}/persona", headers=HEAD, timeout=5).json().get("text","")
+    recall = requests.post(f"{NS}/recall", headers=HEAD, json={"query":"", "top_k":8, "scope":"any", "tool":tool}, timeout=10).json()
+    pre = []
+    if persona:
+        pre += [f"Persona: {persona}", ""]
+    for i,it in enumerate(recall.get("items",[]),1):
+        pre.append(f"[M{i}] ({it.get('kind')},{it.get('scope')},conf={it.get('confidence','')}) {it.get('text','')}")
+    return "\n".join(pre)+("\n\n" if pre else "")
+
+def send_remember(line: str):
+    try:
+        if not line.startswith("@remember:"): return
+        payload = {"text":"", "kind":"note", "scope":"global", "tool":None, "tags":[], "confidence":0.8, "source":"nswrap"}
+        rest = line[len("@remember:"):].strip()
+        parts = shlex.split(rest)
+        text_seen = False
+        text_val = []
+        for p in parts:
+            if "=" in p and not text_seen:
+                k,v = p.split("=",1)
+                if k in ["kind","scope","tool"]:
+                    payload[k]=None if v.lower()=="none" else v
+                elif k=="confidence": payload["confidence"]=float(v)
+                elif k=="tag": payload.setdefault("tags",[]).append(v)
+            else:
+                text_seen = True
+                text_val.append(p)
+        if text_val and not payload["text"]:
+            payload["text"]=" ".join(text_val).strip('"')
+        if payload["text"]:
+            requests.post(f"{NS}/remember", headers=HEAD, json=payload, timeout=10)
+    except Exception:
+        pass
+
+def main():
+    if "--" in sys.argv:
+        idx = sys.argv.index("--")
+        cmd = sys.argv[idx+1:]
+        tool = os.environ.get("TOOL_NAME")
+    else:
+        cmd = ["cat"]
+        tool = os.environ.get("TOOL_NAME")
+    preamble = get_preamble(tool)
+    user_input = sys.stdin.read()
+    data = preamble + user_input
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    out,_ = proc.communicate(input=data)
+    for line in out.splitlines():
+        print(line)
+        if line.startswith("@remember:"):
+            send_remember(line)
+    sys.exit(proc.returncode)
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,8 @@
+# ~/.neuralsync/config.yaml
+site_id: "b1653939-9c3b-4d4e-aa4d-9a2809305a26"
+db_path: "/home/sandbox/.neuralsync/memory.db"
+oplog_path: "/home/sandbox/.neuralsync/oplog.jsonl"
+vector_dim: 512
+bind_host: "127.0.0.1"
+bind_port: 8373
+token: ""

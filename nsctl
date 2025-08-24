@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+import os, json, requests, typer
+from typing import Optional, List
+
+app = typer.Typer(help="NeuralSync CLI")
+
+def host():
+    return os.environ.get("NS_ENDPOINT", f"http://{os.environ.get('NS_HOST','127.0.0.1')}:{os.environ.get('NS_PORT','8373')}")
+
+def headers():
+    token = os.environ.get("NS_TOKEN","")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+@app.command()
+def health():
+    r = requests.get(host()+"/health", headers=headers(), timeout=5)
+    typer.echo(json.dumps(r.json(), indent=2))
+
+@app.command()
+def persona(action: str, text: Optional[str] = typer.Option(None, "--text", "-t")):
+    if action == "get":
+        r = requests.get(host()+"/persona", headers=headers(), timeout=10)
+        typer.echo(r.json().get("text",""))
+    elif action == "set":
+        if not text:
+            raise typer.BadParameter("Provide --text")
+        r = requests.post(host()+"/persona", headers=headers(), json={"text": text}, timeout=10)
+        typer.echo("OK")
+    else:
+        raise typer.BadParameter("action must be get|set")
+
+@app.command()
+def remember(text: str = typer.Option(..., "--text", "-x"),
+            kind: str = typer.Option("fact", "--kind"),
+            scope: str = typer.Option("global", "--scope"),
+            tool: Optional[str] = typer.Option(None, "--tool"),
+            tag: List[str] = typer.Option([], "--tag"),
+            confidence: float = typer.Option(0.8, "--confidence"),
+            ttl_ms: Optional[int] = typer.Option(None, "--ttl-ms"),
+            benefit: Optional[float] = typer.Option(None, "--benefit"),
+            consistency: Optional[float] = typer.Option(None, "--consistency"),
+            source: Optional[str] = typer.Option("nsctl", "--source")):
+    body = dict(text=text, kind=kind, scope=scope, tool=tool, tags=tag, confidence=confidence, ttl_ms=ttl_ms, source=source)
+    if benefit is not None: body["benefit"] = benefit
+    if consistency is not None: body["consistency"] = consistency
+    r = requests.post(host()+"/remember", headers=headers(), json=body, timeout=15)
+    typer.echo(json.dumps(r.json(), indent=2))
+
+@app.command()
+def recall(query: str,
+           k: int = typer.Option(8, "-k", "--top-k"),
+           scope: str = typer.Option("any", "--scope"),
+           tool: Optional[str] = typer.Option(None, "--tool"),
+           preamble: bool = typer.Option(True, "--preamble/--no-preamble")):
+    body = {"query": query, "top_k": k, "scope": scope, "tool": tool, "use_embedding": True}
+    r = requests.post(host()+"/recall", headers=headers(), json=body, timeout=20).json()
+    if preamble: typer.echo(r.get("preamble",""))
+    else: typer.echo(json.dumps(r.get("items",[]), indent=2))
+
+if __name__ == "__main__":
+    app()
