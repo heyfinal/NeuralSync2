@@ -1,9 +1,34 @@
 #!/usr/bin/env python3
-import os, sys, shlex, subprocess, requests
+import os, sys, shlex, subprocess, requests, asyncio
 from typing import Optional
+from pathlib import Path
+
+# Add neuralsync to path for imports
+sys.path.insert(0, str(Path(__file__).parent))
 
 NS = os.environ.get("NS_ENDPOINT", f"http://{os.environ.get('NS_HOST','127.0.0.1')}:{os.environ.get('NS_PORT','8373')}")
 HEAD = {"Authorization": f"Bearer {os.environ['NS_TOKEN']}"} if os.environ.get("NS_TOKEN") else {}
+
+def ensure_neuralsync_running():
+    """Ensure NeuralSync services are running before proceeding"""
+    try:
+        from neuralsync.enhanced_daemon_manager import ensure_neuralsync_running_enhanced
+        return asyncio.run(ensure_neuralsync_running_enhanced())
+    except ImportError:
+        # Fallback to original daemon manager
+        try:
+            from neuralsync.daemon_manager import ensure_neuralsync_running
+            return asyncio.run(ensure_neuralsync_running())
+        except ImportError:
+            # No daemon manager available, just try to connect
+            pass
+    
+    # Basic connectivity check
+    try:
+        response = requests.get(f"{NS}/health", headers=HEAD, timeout=2)
+        return response.status_code == 200
+    except:
+        return False
 
 def get_preamble(tool: Optional[str]):
     persona = requests.get(f"{NS}/persona", headers=HEAD, timeout=5).json().get("text","")
@@ -41,6 +66,10 @@ def send_remember(line: str):
         pass
 
 def main():
+    # Ensure NeuralSync is running before proceeding
+    if not ensure_neuralsync_running():
+        print("⚠️  Warning: NeuralSync services may not be fully available", file=sys.stderr)
+    
     if "--" in sys.argv:
         idx = sys.argv.index("--")
         cmd = sys.argv[idx+1:]
@@ -48,7 +77,14 @@ def main():
     else:
         cmd = ["cat"]
         tool = os.environ.get("TOOL_NAME")
-    preamble = get_preamble(tool)
+    
+    # Get preamble with enhanced error handling
+    try:
+        preamble = get_preamble(tool)
+    except requests.RequestException as e:
+        print(f"⚠️  Warning: Could not retrieve NeuralSync context: {e}", file=sys.stderr)
+        preamble = ""
+    
     user_input = sys.stdin.read()
     data = preamble + user_input
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
