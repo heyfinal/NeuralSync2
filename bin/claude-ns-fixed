@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+"""
+Fixed claude-ns launcher - Handles stdin/raw mode issues
+"""
+
+import sys
+import os
+import subprocess
+import asyncio
+import json
+import time
+import signal
+import logging
+from pathlib import Path
+from typing import Optional, List, Dict, Any
+
+# Add NeuralSync to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Configure logging to be less verbose
+logging.basicConfig(
+    level=logging.ERROR,
+    format='%(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
+class ClaudeNSLauncher:
+    """Fixed launcher for claude-ns that handles stdin issues"""
+    
+    def __init__(self):
+        self.neuralsync_base = Path(__file__).parent.parent
+        self.config_dir = Path.home() / '.neuralsync'
+        self.services_started = False
+        
+    def ensure_services_running(self) -> bool:
+        """Ensure NeuralSync services are running without async complications"""
+        try:
+            # Check if services are already running
+            status_check = subprocess.run(
+                [sys.executable, '-c', '''
+import sys
+sys.path.insert(0, "{}")
+from neuralsync.daemon_manager import get_daemon_manager
+manager = get_daemon_manager()
+info = manager.get_system_info()
+print(info["daemon_manager"]["running"])
+'''.format(self.neuralsync_base)],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if status_check.returncode == 0 and status_check.stdout.strip() == 'True':
+                return True
+                
+            # Start services if not running
+            print("Starting NeuralSync services...", file=sys.stderr)
+            
+            # Create minimal config if needed
+            self.config_dir.mkdir(exist_ok=True)
+            config_file = self.config_dir / 'neuralsync.yaml'
+            
+            if not config_file.exists():
+                minimal_config = {
+                    'bind_host': '127.0.0.1',
+                    'bind_port': 11001,
+                    'token': '',
+                    'persona': '',
+                    'storage': {
+                        'type': 'local',
+                        'path': str(self.config_dir / 'memory.db')
+                    }
+                }
+                with open(config_file, 'w') as f:
+                    import yaml
+                    yaml.dump(minimal_config, f)
+                    
+            # Start daemon manager
+            daemon_script = self.neuralsync_base / 'neuralsync' / 'daemon_manager.py'
+            if daemon_script.exists():
+                subprocess.Popen(
+                    [sys.executable, str(daemon_script), 'start'],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True
+                )
+                time.sleep(3)  # Wait for services to start
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to ensure services: {e}")
+            
+        return False
+        
+    def get_shared_context(self) -> str:
+        """Get NeuralSync context without async"""
+        try:
+            import requests
+            
+            # Try to get persona and recent memories
+            try:
+                response = requests.get(
+                    "http://127.0.0.1:11001/persona",
+                    timeout=2
+                )
+                if response.status_code == 200:
+                    persona = response.json().get('text', '')
+                    if persona:
+                        return f"Context: {persona}\n\n"
+            except:
+                pass
+                
+        except:
+            pass
+            
+        return ""
+        
+    def run_claude_code_direct(self, args: List[str]) -> int:
+        """Run claude-code directly without async wrapper"""
+        try:
+            # Find claude-code executable
+            claude_code_paths = [
+                '/usr/local/bin/claude-code',
+                '/opt/homebrew/bin/claude-code',
+                Path.home() / '.local' / 'bin' / 'claude-code',
+                Path.home() / 'bin' / 'claude-code'
+            ]
+            
+            claude_code_cmd = None
+            for path in claude_code_paths:
+                if path.exists():
+                    claude_code_cmd = str(path)
+                    break
+                    
+            if not claude_code_cmd:
+                # Try which command
+                try:
+                    result = subprocess.run(['which', 'claude-code'], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        claude_code_cmd = result.stdout.strip()
+                except:
+                    pass
+                    
+            if not claude_code_cmd:
+                print("ERROR: claude-code not found. Please install Claude Code CLI first.", file=sys.stderr)
+                print("Visit: https://claude.ai/code", file=sys.stderr)
+                return 1
+                
+            # Get shared context
+            context = self.get_shared_context()
+            
+            # Prepare environment
+            env = os.environ.copy()
+            env.update({
+                'NS_HOST': '127.0.0.1',
+                'NS_PORT': '11001',
+                'NEURALSYNC_CONTEXT': context,
+                'CLI_WRAPPER': 'claude-ns-fixed',
+                'TERM': 'dumb',  # Disable raw mode requirements
+                'NO_COLOR': '1'  # Disable color output that might need raw mode
+            })
+            
+            # Handle different input modes
+            if not sys.stdin.isatty():
+                # Reading from pipe - inject context
+                input_data = sys.stdin.read()
+                full_input = context + input_data if context else input_data
+                
+                # Run with piped input
+                process = subprocess.Popen(
+                    [claude_code_cmd] + args,
+                    stdin=subprocess.PIPE,
+                    stdout=sys.stdout,
+                    stderr=sys.stderr,
+                    env=env,
+                    text=True
+                )
+                
+                process.communicate(input=full_input)
+                return process.returncode
+                
+            else:
+                # Interactive mode - run directly but with fixed environment
+                # Use script command to provide a PTY if needed
+                if sys.platform == 'darwin':  # macOS
+                    # Use script to provide PTY
+                    script_cmd = [
+                        'script', '-q', '/dev/null',
+                        claude_code_cmd
+                    ] + args
+                    
+                    process = subprocess.run(
+                        script_cmd,
+                        env=env
+                    )
+                    return process.returncode
+                else:
+                    # Direct execution on other platforms
+                    process = subprocess.run(
+                        [claude_code_cmd] + args,
+                        env=env
+                    )
+                    return process.returncode
+                    
+        except Exception as e:
+            print(f"ERROR: Failed to run claude-code: {e}", file=sys.stderr)
+            return 1
+            
+    def run(self, args: List[str]) -> int:
+        """Main entry point"""
+        try:
+            # Handle special arguments
+            if args and args[0] == '--neuralsync-status':
+                # Check status without starting services
+                try:
+                    status = subprocess.run(
+                        [sys.executable, '-c', '''
+import sys
+sys.path.insert(0, "{}")
+from neuralsync.daemon_manager import get_daemon_manager
+import json
+manager = get_daemon_manager()
+print(json.dumps(manager.get_system_info(), indent=2))
+'''.format(self.neuralsync_base)],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    print(status.stdout)
+                except Exception as e:
+                    print(json.dumps({'error': str(e)}, indent=2))
+                return 0
+                
+            # Only start services if not checking status
+            if '--help' not in args and '--version' not in args:
+                # Try to ensure services are running but don't fail if they aren't
+                services_ready = self.ensure_services_running()
+                if not services_ready:
+                    print("Note: Running without NeuralSync integration", file=sys.stderr)
+                    
+            # Run claude-code
+            return self.run_claude_code_direct(args)
+            
+        except KeyboardInterrupt:
+            return 130  # Standard exit code for SIGINT
+        except Exception as e:
+            logger.error(f"Launcher error: {e}")
+            return 1
+
+
+def main():
+    """Main entry point"""
+    launcher = ClaudeNSLauncher()
+    
+    # Handle signals
+    def signal_handler(sig, frame):
+        sys.exit(0)
+        
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Run launcher
+    sys.exit(launcher.run(sys.argv[1:]))
+
+
+if __name__ == "__main__":
+    main()
