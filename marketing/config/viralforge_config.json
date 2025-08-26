@@ -1,0 +1,8 @@
+{
+  "neuralsync2_repo": "https://github.com/heyfinal/NeuralSync2",
+  "target_stars": 10000,
+  "campaign_duration": 30,
+  "output_directory": "./viral_output",
+  "database_path": "./viralforge.db",
+  "log_level": "INFO"
+}
