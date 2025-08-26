@@ -75,17 +75,42 @@ def main():
         cmd = sys.argv[idx+1:]
         tool = os.environ.get("TOOL_NAME")
     else:
-        cmd = ["cat"]
+        # Default behavior - if no command specified, just show help
+        if len(sys.argv) == 1:
+            print("Usage: nswrap -- <command> [args...]")
+            print("Environment: Set TOOL_NAME to identify tool context")
+            sys.exit(0)
+        cmd = sys.argv[1:]  # Use remaining args as command
         tool = os.environ.get("TOOL_NAME")
     
-    # Get preamble with enhanced error handling
-    try:
-        preamble = get_preamble(tool)
-    except requests.RequestException as e:
-        print(f"⚠️  Warning: Could not retrieve NeuralSync context: {e}", file=sys.stderr)
-        preamble = ""
+    # Get preamble with enhanced error handling - only if tool is meaningful
+    preamble = ""
+    if tool and cmd[0] not in ['--help', '--version', '-h', '-v']:
+        try:
+            preamble = get_preamble(tool)
+        except requests.RequestException as e:
+            print(f"⚠️  Warning: Could not retrieve NeuralSync context: {e}", file=sys.stderr)
+            preamble = ""
+        except Exception as e:
+            # Silently fail for other errors to avoid disrupting tool usage
+            preamble = ""
     
-    user_input = sys.stdin.read()
+    # Handle stdin intelligently - don't block on empty input
+    if sys.stdin.isatty():
+        # Interactive mode - don't read stdin unless there's actual input
+        user_input = ""
+    else:
+        # Non-interactive mode - read with timeout to avoid hanging
+        try:
+            import select
+            if select.select([sys.stdin], [], [], 0.1)[0]:  # 100ms timeout
+                user_input = sys.stdin.read()
+            else:
+                user_input = ""
+        except ImportError:
+            # Fallback for platforms without select
+            user_input = ""
+    
     data = preamble + user_input
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     out,_ = proc.communicate(input=data)

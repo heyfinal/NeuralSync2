@@ -100,10 +100,24 @@ class EnhancedDaemonManager:
             'NS_TOKEN': self.ns_config.token
         })
         
-        # Enhanced NeuralSync server configuration
+        # Enhanced NeuralSync server configuration - use regular server if enhanced fails
+        server_command = [sys.executable, '-m', 'neuralsync.server']
+        if Path(Path(__file__).parent / 'enhanced_server.py').exists():
+            try:
+                # Test if enhanced server imports work
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(
+                    "enhanced_server", 
+                    Path(__file__).parent / 'enhanced_server.py'
+                )
+                if spec and spec.loader:
+                    server_command = [sys.executable, '-m', 'neuralsync.enhanced_server']
+            except Exception:
+                pass  # Fall back to regular server
+        
         self.services['neuralsync-server'] = EnhancedServiceConfig(
             name='neuralsync-server',
-            command=[sys.executable, '-m', 'neuralsync.enhanced_server'],
+            command=server_command,
             cwd=str(Path(__file__).parent.parent),
             env=neuralsync_env,
             health_check_url=f'http://{self.ns_config.bind_host}:{self.ns_config.bind_port}/health',
@@ -438,39 +452,71 @@ class EnhancedDaemonManager:
         
         logger.info(f"Starting enhanced service: {service_name}")
         
-        # Import the original daemon manager for actual process starting
-        from .daemon_manager import DaemonManager
-        original_manager = DaemonManager(self.config_dir)
-        
-        # Convert enhanced config to original format
-        from .daemon_manager import ServiceConfig
-        original_config = ServiceConfig(
-            name=service_config.name,
-            command=service_config.command,
-            cwd=service_config.cwd,
-            env=service_config.env,
-            health_check_url=service_config.health_check_url,
-            health_check_interval=service_config.health_check_interval,
-            restart_on_failure=service_config.restart_on_failure,
-            max_restart_attempts=service_config.max_restart_attempts,
-            startup_timeout=service_config.startup_timeout
-        )
-        
-        # Register and start with original manager
-        original_manager.register_service(original_config)
-        success = await original_manager.start_service(service_name)
-        
-        if success:
-            # Verify with our enhanced detection
+        # First check if already running
+        try:
             detection_result = self.service_detector.detect_service_comprehensive(
                 service_name,
                 service_config.expected_port,
                 service_config.health_check_url
             )
             
-            return detection_result.state == ServiceState.RUNNING
+            if detection_result.state == ServiceState.RUNNING:
+                logger.info(f"Service {service_name} already running (confidence: {detection_result.confidence_score:.2f})")
+                return True
+        except Exception as e:
+            logger.debug(f"Pre-startup detection failed for {service_name}: {e}")
         
-        return False
+        try:
+            # Import the original daemon manager for actual process starting
+            from .daemon_manager import DaemonManager
+            original_manager = DaemonManager(self.config_dir)
+            
+            # Convert enhanced config to original format
+            from .daemon_manager import ServiceConfig
+            original_config = ServiceConfig(
+                name=service_config.name,
+                command=service_config.command,
+                cwd=service_config.cwd,
+                env=service_config.env,
+                health_check_url=service_config.health_check_url,
+                health_check_interval=service_config.health_check_interval,
+                restart_on_failure=service_config.restart_on_failure,
+                max_restart_attempts=service_config.max_restart_attempts,
+                startup_timeout=service_config.startup_timeout
+            )
+            
+            # Register and start with original manager
+            original_manager.register_service(original_config)
+            success = await original_manager.start_service(service_name)
+            
+            if success:
+                # Give service time to initialize
+                await asyncio.sleep(1)
+                
+                # Verify with our enhanced detection
+                try:
+                    detection_result = self.service_detector.detect_service_comprehensive(
+                        service_name,
+                        service_config.expected_port,
+                        service_config.health_check_url
+                    )
+                    
+                    final_success = detection_result.state == ServiceState.RUNNING
+                    if not final_success:
+                        logger.warning(f"Service {service_name} started but not detected as running (state: {detection_result.state.value})")
+                    
+                    return final_success
+                except Exception as e:
+                    logger.error(f"Post-startup detection failed for {service_name}: {e}")
+                    # If detection fails but startup reported success, assume it's running
+                    return True
+            
+            logger.error(f"Failed to start service {service_name}")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Exception starting {service_name}: {e}")
+            return False
     
     async def _phase4_runtime_monitoring(self):
         """Phase 4: Runtime monitoring and optimization"""

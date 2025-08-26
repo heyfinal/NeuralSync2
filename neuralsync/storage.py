@@ -427,7 +427,13 @@ def _insert_or_update(con: sqlite3.Connection, item: Dict[str,Any]):
         expires_at=excluded.expires_at, tombstone=excluded.tombstone,
         site_id=excluded.site_id, lamport=excluded.lamport, source=excluded.source,
         meta=excluded.meta""", vals)
-    con.execute("INSERT INTO items_fts(id, text) VALUES(?, ?) ON CONFLICT(id) DO UPDATE SET text=excluded.text", (item['id'], item['text']))
+    # Handle FTS update (virtual tables don't support UPSERT)
+    try:
+        con.execute("INSERT INTO items_fts(id, text) VALUES(?, ?)", (item['id'], item['text']))
+    except sqlite3.IntegrityError:
+        # Record exists, update it
+        con.execute("DELETE FROM items_fts WHERE id = ?", (item['id'],))
+        con.execute("INSERT INTO items_fts(id, text) VALUES(?, ?)", (item['id'], item['text']))
     con.commit()
 
 def upsert_item(storage, item: Dict[str,Any]) -> Dict[str,Any]:

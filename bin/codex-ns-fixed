@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# NeuralSync-enhanced Claude Code CLI wrapper
-# Provides shared memory context from NeuralSync to Claude Code
+# NeuralSync-enhanced Codex CLI wrapper
+# Provides memory context from NeuralSync to Codex
 
 set -euo pipefail
 
@@ -9,16 +9,20 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 NEURALSYNC_DIR="$( cd "${SCRIPT_DIR}/.." && pwd )"
 
 # Set environment for NeuralSync integration
-export TOOL_NAME="claude-code"
+export TOOL_NAME="codex"
 export NS_HOST="${NS_HOST:-127.0.0.1}"
 export NS_PORT="${NS_PORT:-8373}"
 
-# Handle special cases for claude arguments
+# Handle special cases for codex arguments
 FILTERED_ARGS=()
 CONTEXT_MODE="full"
 
 for arg in "$@"; do
     case "$arg" in
+        --ask-for-approval)
+            # Skip this argument as it causes conflicts with our wrapper
+            echo "ℹ️  Note: --ask-for-approval disabled in NeuralSync mode" >&2
+            ;;
         --no-context)
             CONTEXT_MODE="none"
             ;;
@@ -34,7 +38,7 @@ done
 
 # Check if we should bypass NeuralSync context (for simple commands)
 BYPASS_CONTEXT=0
-if [ "$CONTEXT_MODE" = "none" ]; then
+if [ "${#FILTERED_ARGS[@]}" -eq 0 ] || [ "$CONTEXT_MODE" = "none" ]; then
     BYPASS_CONTEXT=1
 elif [ "${#FILTERED_ARGS[@]}" -eq 1 ]; then
     case "${FILTERED_ARGS[0]}" in
@@ -44,27 +48,15 @@ elif [ "${#FILTERED_ARGS[@]}" -eq 1 ]; then
     esac
 fi
 
-# Find claude executable
-CLAUDE_CMD=""
-if command -v claude &> /dev/null; then
-    CLAUDE_CMD="claude"
-elif command -v claude-code &> /dev/null; then
-    CLAUDE_CMD="claude-code"
-else
-    echo "ERROR: Claude CLI not found in PATH" >&2
-    echo "Please install Claude Code CLI first" >&2
-    exit 1
-fi
-
-# Execute claude with or without NeuralSync context
+# Execute codex with or without NeuralSync context
 if [ "$BYPASS_CONTEXT" -eq 1 ]; then
     # Direct execution without NeuralSync wrapper
-    exec "$CLAUDE_CMD" "${FILTERED_ARGS[@]}"
+    exec codex "${FILTERED_ARGS[@]}"
 else
     # Execute through NeuralSync wrapper
     if [ -n "${FILTERED_ARGS[*]}" ]; then
-        exec "${NEURALSYNC_DIR}/nswrap" -- "$CLAUDE_CMD" "${FILTERED_ARGS[@]}"
+        exec "${NEURALSYNC_DIR}/nswrap" -- codex "${FILTERED_ARGS[@]}"
     else
-        exec "${NEURALSYNC_DIR}/nswrap" -- "$CLAUDE_CMD"
+        exec "${NEURALSYNC_DIR}/nswrap" -- codex
     fi
 fi

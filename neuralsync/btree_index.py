@@ -595,10 +595,20 @@ class BTreeIndex:
                 current_size = self.file_handle.tell()
                 if total_size > current_size:
                     self.file_handle.truncate(total_size)
+                    self.file_handle.flush()  # Ensure file size is committed
                     
-                # Create/update memory map
+                # Create/update memory map with bounds checking
                 if self.mmap_file:
                     self.mmap_file.close()
+                    
+                # Ensure file size is correct before mapping
+                self.file_handle.seek(0, 2)
+                actual_size = self.file_handle.tell()
+                if actual_size < total_size:
+                    # Write zeros to extend file
+                    self.file_handle.write(b'\x00' * (total_size - actual_size))
+                    self.file_handle.flush()
+                    
                 self.mmap_file = mmap.mmap(self.file_handle.fileno(), total_size)
                 
                 # Write header
@@ -618,9 +628,13 @@ class BTreeIndex:
                     self.mmap_file[offset:offset+8] = size_header
                     offset += 8
                     
-                    # Write node data
-                    self.mmap_file[offset:offset+len(serialized)] = serialized
-                    offset += len(serialized)
+                    # Write node data with bounds checking
+                    if offset + len(serialized) <= len(self.mmap_file):
+                        self.mmap_file[offset:offset+len(serialized)] = serialized
+                        offset += len(serialized)
+                    else:
+                        logger.warning(f"Skipping node write - would exceed mmap bounds: {offset + len(serialized)} > {len(self.mmap_file)}")
+                        break
                     
                 # Sync to disk
                 self.mmap_file.flush()
@@ -636,6 +650,13 @@ class BTreeIndex:
                 
         except Exception as e:
             logger.error(f"Failed to flush B+ tree: {e}")
+            # Clean up on error
+            try:
+                if self.mmap_file:
+                    self.mmap_file.close()
+                    self.mmap_file = None
+            except Exception:
+                pass
             
     def get_stats(self) -> Dict[str, Any]:
         """Get comprehensive performance statistics"""

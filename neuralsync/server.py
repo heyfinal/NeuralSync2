@@ -60,12 +60,25 @@ async def remember_post(body: MemoryIn):
         'meta': json.dumps(body.meta or {}, ensure_ascii=False),
     }
     out = upsert_item(con, item)
-    oplog.append({'op':'add','id':out['id'],'lamport':out['lamport'],'site_id':out['site_id'],'clock_ts':now_ms(),'payload':out})
-    return out
+    
+    # Create JSON-safe payload for oplog (exclude binary data)
+    payload = {k: v for k, v in out.items() if k != 'vector'}
+    oplog.append({'op':'add','id':out['id'],'lamport':out['lamport'],'site_id':out['site_id'],'clock_ts':now_ms(),'payload':payload})
+    
+    # Return JSON-safe response
+    response = {k: v for k, v in out.items() if k != 'vector'}
+    return response
 
 @app.post('/recall', dependencies=[Depends(bearer_guard)])
 async def recall_post(body: RecallIn):
-    items = recall(con, body.query, body.top_k, body.scope, body.tool)
+    raw_items = recall(con, body.query, body.top_k, body.scope, body.tool)
+    
+    # Filter out binary data for JSON serialization
+    items = []
+    for item in raw_items:
+        clean_item = {k: v for k, v in item.items() if k != 'vector'}
+        items.append(clean_item)
+    
     persona = get_persona(con).get('text','')
     pre = ''
     if persona: pre += f"Persona: {persona}\n\n"

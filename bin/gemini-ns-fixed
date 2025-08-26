@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# NeuralSync-enhanced Claude Code CLI wrapper
-# Provides shared memory context from NeuralSync to Claude Code
+# NeuralSync-enhanced Gemini CLI wrapper
+# Provides shared memory context from NeuralSync to Gemini
 
 set -euo pipefail
 
@@ -9,11 +9,11 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 NEURALSYNC_DIR="$( cd "${SCRIPT_DIR}/.." && pwd )"
 
 # Set environment for NeuralSync integration
-export TOOL_NAME="claude-code"
+export TOOL_NAME="gemini"
 export NS_HOST="${NS_HOST:-127.0.0.1}"
 export NS_PORT="${NS_PORT:-8373}"
 
-# Handle special cases for claude arguments
+# Handle special cases for gemini arguments
 FILTERED_ARGS=()
 CONTEXT_MODE="full"
 
@@ -44,27 +44,27 @@ elif [ "${#FILTERED_ARGS[@]}" -eq 1 ]; then
     esac
 fi
 
-# Find claude executable
-CLAUDE_CMD=""
-if command -v claude &> /dev/null; then
-    CLAUDE_CMD="claude"
-elif command -v claude-code &> /dev/null; then
-    CLAUDE_CMD="claude-code"
+# Find gemini executable
+GEMINI_CMD=""
+if command -v gemini &> /dev/null; then
+    GEMINI_CMD="gemini"
+elif command -v gemini-cli &> /dev/null; then
+    GEMINI_CMD="gemini-cli"
 else
-    echo "ERROR: Claude CLI not found in PATH" >&2
-    echo "Please install Claude Code CLI first" >&2
+    echo "ERROR: Gemini CLI not found in PATH" >&2
+    echo "Please install Gemini CLI first" >&2
     exit 1
 fi
 
-# Execute claude with or without NeuralSync context
+# Execute gemini with or without NeuralSync context
 if [ "$BYPASS_CONTEXT" -eq 1 ]; then
     # Direct execution without NeuralSync wrapper
-    exec "$CLAUDE_CMD" "${FILTERED_ARGS[@]}"
+    exec "$GEMINI_CMD" "${FILTERED_ARGS[@]}"
 else
     # Execute through NeuralSync wrapper
     if [ -n "${FILTERED_ARGS[*]}" ]; then
-        exec "${NEURALSYNC_DIR}/nswrap" -- "$CLAUDE_CMD" "${FILTERED_ARGS[@]}"
+        exec "${NEURALSYNC_DIR}/nswrap" -- "$GEMINI_CMD" "${FILTERED_ARGS[@]}"
     else
-        exec "${NEURALSYNC_DIR}/nswrap" -- "$CLAUDE_CMD"
+        exec "${NEURALSYNC_DIR}/nswrap" -- "$GEMINI_CMD"
     fi
 fi
