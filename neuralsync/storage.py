@@ -46,10 +46,11 @@ class EnhancedStorage:
         self.db_path = db_path
         self.memory_pool_size = memory_pool_size
         
-        # Traditional SQLite connection for compatibility
-        self.con = sqlite3.connect(db_path)
+        # Traditional SQLite connection for compatibility (thread-safe and resilient)
+        self.con = sqlite3.connect(db_path, check_same_thread=False, timeout=5.0)
         self.con.execute('PRAGMA journal_mode=WAL;')
         self.con.execute('PRAGMA synchronous=NORMAL;')
+        self.con.execute('PRAGMA busy_timeout=5000;')
         self.con.executescript(SCHEMA)
         
         # Memory-mapped components
@@ -124,11 +125,12 @@ class EnhancedStorage:
             
             if new_offset >= len(self.mmap):
                 # Need to expand file
+                old_len = len(self.mmap)
                 self.mmap.close()
                 self.mmap_file.close()
                 
-                # Double the size
-                new_size = max(len(self.mmap) * 2, new_offset + self.memory_pool_size)
+                # Double the size based on previous length
+                new_size = max(old_len * 2, new_offset + self.memory_pool_size)
                 
                 with open(self.mmap_path, 'r+b') as f:
                     f.truncate(new_size)

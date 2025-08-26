@@ -1,0 +1,46 @@
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How do AI tools get memory with NeuralSync2?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "NeuralSync2 creates a shared memory layer that all AI tools connect to, enabling persistent memory across sessions and tools using CRDT synchronization."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my data private with AI memory tools?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes! NeuralSync2 is local-first. All memory data stays on your machine with no cloud dependencies, ensuring complete privacy."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which AI tools work with NeuralSync2 memory?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "All AI tools! Claude, ChatGPT, Gemini, CodexCLI, and any AI tool can use NeuralSync2's universal memory system."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How fast is AI memory synchronization?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "NeuralSync2 provides sub-10ms memory synchronization between AI tools, ensuring instant context sharing."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can AI really install NeuralSync2 itself?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes! Just tell any AI 'install https://github.com/heyfinal/NeuralSync2.git' and it handles the complete installation automatically."
+      }
+    }
+  ]
+}

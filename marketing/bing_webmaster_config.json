@@ -1,0 +1,21 @@
+{
+  "site_url": "https://neuralsync.dev",
+  "verification_method": "xml_file",
+  "api_key": "YOUR_BING_WEBMASTER_API_KEY",
+  "sitemap_urls": [
+    "https://neuralsync.dev/sitemap.xml"
+  ],
+  "crawl_settings": {
+    "crawl_rate": "normal",
+    "preferred_crawl_time": "02:00-06:00"
+  },
+  "geo_targeting": {
+    "primary_country": "US",
+    "additional_countries": [
+      "CA",
+      "GB",
+      "AU"
+    ]
+  },
+  "setup_date": "2025-08-26T14:34:36.815568"
+}

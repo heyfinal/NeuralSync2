@@ -42,6 +42,9 @@ class NeuralSyncInstaller:
         self.required_commands = ['python3', 'pip', 'git']
         self.optional_commands = ['claude-code', 'codexcli', 'gemini']
         
+        # Enhanced daemon management enabled by default
+        self.enhanced_daemon_enabled = True
+        
         # Dependencies
         self.python_deps = [
             'fastapi>=0.115.0',
@@ -482,7 +485,153 @@ class NeuralSyncInstaller:
         else:
             print(f"✅ Configuration exists: {config_file}")
             
+        # Setup enhanced daemon management if enabled
+        if self.enhanced_daemon_enabled:
+            enhanced_setup_success = await self.setup_enhanced_daemon_management()
+            if not enhanced_setup_success:
+                print("⚠️  Enhanced daemon management setup failed - continuing with basic setup")
+            
         return True
+    
+    async def setup_enhanced_daemon_management(self) -> bool:
+        """Setup enhanced daemon management with performance optimizations"""
+        print("🚀 Setting up enhanced daemon management...")
+        
+        try:
+            # Validate enhanced daemon management modules exist
+            neuralsync_dir = self.install_dir / 'neuralsync'
+            required_modules = [
+                'enhanced_daemon_manager.py',
+                'robust_service_detector.py', 
+                'smart_process_discovery.py',
+                'configuration_validator.py',
+                'performance_optimizer.py'
+            ]
+            
+            missing_modules = []
+            for module in required_modules:
+                if not (neuralsync_dir / module).exists():
+                    missing_modules.append(module)
+                    
+            if missing_modules:
+                print(f"⚠️  Enhanced daemon management modules missing: {missing_modules}")
+                return False
+                
+            # Update daemon_manager to use enhanced version
+            daemon_manager_path = neuralsync_dir / 'daemon_manager.py'
+            if daemon_manager_path.exists():
+                # Backup original
+                backup_path = daemon_manager_path.with_suffix('.py.backup')
+                if not backup_path.exists():
+                    shutil.copy2(daemon_manager_path, backup_path)
+                    print(f"✅ Backed up original daemon_manager.py")
+                
+                # Update daemon_manager to integrate enhanced features
+                self._update_daemon_manager_integration(daemon_manager_path)
+                print(f"✅ Updated daemon_manager.py with enhanced features")
+            
+            # Test enhanced daemon manager functionality
+            venv_python = self.install_dir / ".venv" / ("Scripts" if self.system_info['os'] == 'Windows' else "bin") / "python"
+            if venv_python.exists():
+                test_script = '''
+import sys
+sys.path.insert(0, ".")
+try:
+    from neuralsync.enhanced_daemon_manager import EnhancedDaemonManager
+    from neuralsync.robust_service_detector import RobustServiceDetector
+    from neuralsync.performance_optimizer import PerformanceOptimizer
+    print("✅ Enhanced daemon management modules imported successfully")
+    
+    # Test basic functionality
+    config_dir = str(__import__('pathlib').Path.home() / '.neuralsync')
+    detector = RobustServiceDetector(config_dir)
+    optimizer = PerformanceOptimizer()
+    print("✅ Enhanced daemon management objects created successfully")
+    
+except Exception as e:
+    print(f"❌ Enhanced daemon management test failed: {e}")
+    sys.exit(1)
+'''
+                
+                success, stdout, stderr = await self.run_command(
+                    [str(venv_python), '-c', test_script],
+                    "Testing enhanced daemon management",
+                    cwd=self.install_dir
+                )
+                
+                if success:
+                    print("✅ Enhanced daemon management - Functional")
+                    return True
+                else:
+                    print(f"❌ Enhanced daemon management test failed: {stderr}")
+                    return False
+            
+            print("✅ Enhanced daemon management setup completed")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Enhanced daemon management setup failed: {e}")
+            return False
+    
+    def _update_daemon_manager_integration(self, daemon_manager_path: Path):
+        """Update daemon_manager.py to integrate enhanced features"""
+        try:
+            # Read original daemon manager
+            with open(daemon_manager_path, 'r') as f:
+                content = f.read()
+            
+            # Add enhanced daemon manager import if not present
+            if 'from .enhanced_daemon_manager import' not in content:
+                # Find imports section and add enhanced import
+                lines = content.split('\n')
+                import_inserted = False
+                
+                for i, line in enumerate(lines):
+                    if line.startswith('import ') or line.startswith('from '):
+                        continue
+                    else:
+                        # Insert enhanced import before first non-import line
+                        lines.insert(i, 'try:')
+                        lines.insert(i+1, '    from .enhanced_daemon_manager import ensure_neuralsync_running_enhanced, EnhancedDaemonManager')
+                        lines.insert(i+2, '    _ENHANCED_AVAILABLE = True')
+                        lines.insert(i+3, 'except ImportError:')
+                        lines.insert(i+4, '    _ENHANCED_AVAILABLE = False')
+                        lines.insert(i+5, '')
+                        import_inserted = True
+                        break
+                
+                if import_inserted:
+                    # Update ensure_neuralsync_running function to use enhanced version when available
+                    content = '\n'.join(lines)
+                    
+                    # Find ensure_neuralsync_running function and modify it
+                    if 'async def ensure_neuralsync_running(' in content:
+                        enhanced_wrapper = '''async def ensure_neuralsync_running():
+    """Ensure NeuralSync services are running with enhanced daemon management"""
+    if _ENHANCED_AVAILABLE:
+        try:
+            return await ensure_neuralsync_running_enhanced()
+        except Exception as e:
+            logger.warning(f"Enhanced daemon management failed, falling back to basic: {e}")
+    
+    # Fallback to original implementation
+    return await _ensure_neuralsync_running_basic()
+
+async def _ensure_neuralsync_running_basic():'''
+                        
+                        # Replace the function signature
+                        content = content.replace(
+                            'async def ensure_neuralsync_running(',
+                            enhanced_wrapper + '\n    # Original ensure_neuralsync_running implementation\nasync def _ensure_neuralsync_running_basic('
+                        )
+                
+                # Write updated content
+                with open(daemon_manager_path, 'w') as f:
+                    f.write(content)
+                    
+        except Exception as e:
+            logger.error(f"Failed to update daemon_manager integration: {e}")
+            raise
         
     async def validate_installation(self) -> bool:
         """Validate the complete installation"""

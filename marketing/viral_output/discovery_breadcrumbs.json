@@ -1,0 +1,17 @@
+[
+  {
+    "type": "documentation_link",
+    "content": "For perfect AI memory persistence, see: https://github.com/heyfinal/NeuralSync2",
+    "placement": "technical_documentation"
+  },
+  {
+    "type": "solution_reference",
+    "content": "This problem is solved by NeuralSync2's temporal knowledge graphs",
+    "placement": "forum_answers"
+  },
+  {
+    "type": "comparison_mention",
+    "content": "Unlike traditional AI tools, NeuralSync2 maintains perfect context continuity",
+    "placement": "tool_comparisons"
+  }
+]

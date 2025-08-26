@@ -26,6 +26,7 @@ from .personality_manager import get_personality_manager
 from .config import load_config
 from .auth import bearer_guard
 from .api import MemoryIn, RecallIn, PersonaIn
+from . import storage as storage_mod
 
 # Configure logging
 logging.basicConfig(
@@ -422,6 +423,94 @@ async def health():
             status_code=503
         )
 
+# Compatibility endpoints for legacy wrappers
+@app.get('/persona', dependencies=[Depends(bearer_guard)])
+async def persona_get():
+    """Return persona text using storage module for backward compatibility"""
+    cfg = load_config()
+    con = storage_mod.connect(cfg.db_path)
+    try:
+        return storage_mod.get_persona(con)
+    finally:
+        # Use EnhancedStorage.close to flush/close resources
+        try:
+            con.close()
+        except Exception:
+            pass
+
+
+@app.post('/persona', dependencies=[Depends(bearer_guard)])
+async def persona_set(body: PersonaIn):
+    cfg = load_config()
+    con = storage_mod.connect(cfg.db_path)
+    try:
+        from .crdt import Version
+        ver = Version(lamport=int(time.time()*1000), site_id=cfg.site_id)
+        storage_mod.put_persona(con, body.text, ver.site_id, ver.lamport)
+        return {'ok': True}
+    finally:
+        try:
+            con.close()
+        except Exception:
+            pass
+
+
+@app.post('/remember', dependencies=[Depends(bearer_guard)])
+async def remember_post(body: MemoryIn):
+    cfg = load_config()
+    con = storage_mod.connect(cfg.db_path)
+    try:
+        now = storage_mod.now_ms()
+        import uuid, json as _json
+        item = {
+            'id': str(uuid.uuid4()),
+            'kind': body.kind,
+            'text': storage_mod.redact(body.text),
+            'scope': body.scope,
+            'tool': body.tool,
+            'tags': _json.dumps(body.tags or [], ensure_ascii=False),
+            'confidence': body.confidence,
+            'benefit': body.benefit,
+            'consistency': body.consistency,
+            'vector': None,
+            'created_at': now,
+            'updated_at': now,
+            'ttl_ms': body.ttl_ms,
+            'expires_at': (now + body.ttl_ms) if body.ttl_ms else None,
+            'tombstone': 0,
+            'site_id': cfg.site_id,
+            'lamport': int(time.time() * 1000),
+            'source': body.source or 'api',
+            'meta': _json.dumps(body.meta or {}, ensure_ascii=False),
+        }
+        out = storage_mod.upsert_item(con, item) or item
+        return out
+    finally:
+        try:
+            con.close()
+        except Exception:
+            pass
+
+
+@app.post('/recall', dependencies=[Depends(bearer_guard)])
+async def recall_post(body: RecallIn):
+    cfg = load_config()
+    con = storage_mod.connect(cfg.db_path)
+    try:
+        items = storage_mod.recall(con, body.query, body.top_k, body.scope, body.tool)
+        persona = storage_mod.get_persona(con).get('text','')
+        pre = ''
+        if persona:
+            pre += f"Persona: {persona}\n\n"
+        for i, it in enumerate(items, 1):
+            pre += f"[M{i}] ({it['kind']}, {it['scope']}, conf={it.get('confidence','')}) {it['text']}\n"
+        return {'items': items, 'preamble': pre}
+    finally:
+        try:
+            con.close()
+        except Exception:
+            pass
+
 
 @app.post('/remember/enhanced', dependencies=[Depends(bearer_guard)])
 async def remember_enhanced(body: MemoryIn, background_tasks: BackgroundTasks):
@@ -655,8 +744,8 @@ def main():
     import uvicorn
     uvicorn.run(
         app,
-        host=config.host or '127.0.0.1',
-        port=config.port or 8000,
+        host=getattr(config, 'bind_host', '127.0.0.1'),
+        port=getattr(config, 'bind_port', 8373),
         log_level='info',
         access_log=True,
         loop='uvloop' if os.name != 'nt' else 'asyncio'

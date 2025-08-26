@@ -1,0 +1,20 @@
+{
+  "project_id": "neuralsync2-seo",
+  "site_url": "https://neuralsync.dev",
+  "verification_method": "html_file",
+  "sitemap_urls": [
+    "https://neuralsync.dev/sitemap.xml",
+    "https://neuralsync.dev/sitemap_index.xml"
+  ],
+  "target_countries": [
+    "US",
+    "CA",
+    "GB",
+    "AU",
+    "DE"
+  ],
+  "target_languages": [
+    "en"
+  ],
+  "setup_date": "2025-08-26T14:34:36.815568"
+}

@@ -1,0 +1,72 @@
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "NeuralSync2",
+  "description": "Revolutionary AI memory synchronization system that enables persistent memory across AI tools like Claude, GPT, and Gemini. Install using natural language - just tell your AI to install it.",
+  "url": "https://neuralsync.dev",
+  "downloadUrl": "https://github.com/heyfinal/NeuralSync2/archive/main.zip",
+  "softwareVersion": "2.0.0",
+  "releaseDate": "2024-08-26",
+  "operatingSystem": [
+    "Linux",
+    "macOS",
+    "Windows"
+  ],
+  "applicationCategory": [
+    "DeveloperApplication",
+    "ProductivityApplication"
+  ],
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD",
+    "description": "Free and open source"
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "NeuralSync Team",
+    "url": "https://neuralsync.dev",
+    "logo": "https://neuralsync.dev/images/neuralsync-logo.png",
+    "description": "Developers of NeuralSync2, the revolutionary AI memory synchronization system",
+    "sameAs": [
+      "https://github.com/heyfinal/NeuralSync2",
+      "https://twitter.com/neuralsync2",
+      "https://linkedin.com/company/neuralsync"
+    ]
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "NeuralSync Team",
+    "url": "https://neuralsync.dev",
+    "logo": "https://neuralsync.dev/images/neuralsync-logo.png",
+    "description": "Developers of NeuralSync2, the revolutionary AI memory synchronization system",
+    "sameAs": [
+      "https://github.com/heyfinal/NeuralSync2",
+      "https://twitter.com/neuralsync2",
+      "https://linkedin.com/company/neuralsync"
+    ]
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.9",
+    "reviewCount": "127",
+    "bestRating": "5",
+    "worstRating": "1"
+  },
+  "featureList": [
+    "Persistent AI memory across sessions",
+    "Cross-tool memory synchronization between Claude, GPT, Gemini",
+    "Sub-10ms memory sync speed",
+    "Natural language installation - AI installs itself",
+    "CRDT-based synchronization for reliability",
+    "Local-first data storage for privacy",
+    "Universal compatibility with all AI tools",
+    "Zero manual configuration required"
+  ],
+  "requirements": "Python 3.8+, 2GB RAM, 1GB disk space",
+  "screenshot": [
+    "https://neuralsync.dev/images/neuralsync-dashboard.png",
+    "https://neuralsync.dev/images/neuralsync-install-demo.png"
+  ],
+  "keywords": "AI memory, Claude tools, persistent AI, AI synchronization, neural sync, cross-session memory, AI agent frameworks"
+}

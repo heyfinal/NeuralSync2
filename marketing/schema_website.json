@@ -1,0 +1,18 @@
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "NeuralSync2 - AI Memory Synchronization",
+  "description": "Revolutionary AI tools with memory that never forget. Claude, GPT, Gemini with persistent memory across sessions.",
+  "url": "https://neuralsync.dev",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": {
+      "@type": "EntryPoint",
+      "urlTemplate": "https://neuralsync.dev/search?q={search_term_string}"
+    },
+    "query-input": "required name=search_term_string"
+  },
+  "sameAs": [
+    "https://github.com/heyfinal/NeuralSync2"
+  ]
+}

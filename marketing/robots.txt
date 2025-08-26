@@ -1,0 +1,44 @@
+# robots.txt for NeuralSync2 - AI Memory Synchronization
+# Allow all search engines to crawl and index everything
+
+User-agent: *
+Allow: /
+Crawl-delay: 1
+
+# Specific rules for major search engines
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 1
+
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+User-agent: Slurp
+Allow: /
+Crawl-delay: 1
+
+User-agent: DuckDuckBot
+Allow: /
+Crawl-delay: 1
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+# Disallow common non-content directories
+Disallow: /logs/
+Disallow: /config/
+Disallow: *.log
+Disallow: /private/
+Disallow: /temp/
+Disallow: /cache/
+
+# Important: Point to sitemap
+Sitemap: https://neuralsync.dev/sitemap.xml
+
+# Alternative sitemap locations
+Sitemap: https://neuralsync.dev/sitemap_index.xml
+Sitemap: https://install.neuralsync.dev/sitemap.xml

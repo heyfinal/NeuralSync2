@@ -21,9 +21,26 @@ import re
 
 # Advanced similarity detection
 from difflib import SequenceMatcher
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-import spacy
+# Optional heavy deps: sklearn, spacy
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore
+    from sklearn.metrics.pairwise import cosine_similarity  # type: ignore
+    _HAS_SKLEARN = True
+except Exception:
+    _HAS_SKLEARN = False
+    class TfidfVectorizer:  # minimal stub
+        def __init__(self, **kwargs):
+            self._vocab = {}
+        def fit_transform(self, texts):
+            return np.zeros((len(texts), 1), dtype=np.float32)
+        def transform(self, texts):
+            return np.zeros((len(texts), 1), dtype=np.float32)
+    def cosine_similarity(a, b):
+        return np.zeros((a.shape[0], b.shape[0]), dtype=np.float32)
+try:
+    import spacy  # type: ignore
+except Exception:
+    spacy = None
 
 @dataclass
 class ResearchEntry:
@@ -51,18 +68,22 @@ class ResearchDatabase:
         
         # Initialize NLP model for semantic analysis
         try:
-            self.nlp = spacy.load("en_core_web_sm")
+            if spacy is not None:
+                self.nlp = spacy.load("en_core_web_sm")
+            else:
+                raise OSError("spacy not installed")
         except OSError:
-            print("⚠️ spaCy model not found, using basic similarity")
+            print("⚠️ spaCy model not available, using basic similarity")
             self.nlp = None
             
         # Initialize TF-IDF vectorizer
+        # Initialize TF-IDF vectorizer (fallback to stub if sklearn missing)
         self.tfidf_vectorizer = TfidfVectorizer(
-            max_features=1000,
-            stop_words='english',
-            ngram_range=(1, 2),
-            lowercase=True,
-            strip_accents='unicode'
+            max_features=1000 if _HAS_SKLEARN else None,
+            stop_words='english' if _HAS_SKLEARN else None,
+            ngram_range=(1, 2) if _HAS_SKLEARN else None,
+            lowercase=True if _HAS_SKLEARN else None,
+            strip_accents='unicode' if _HAS_SKLEARN else None
         )
         
         self.bloom_filter: Set[str] = set()

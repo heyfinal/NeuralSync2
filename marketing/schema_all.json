@@ -1,0 +1,270 @@
+{
+  "software": {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "NeuralSync2",
+    "description": "Revolutionary AI memory synchronization system that enables persistent memory across AI tools like Claude, GPT, and Gemini. Install using natural language - just tell your AI to install it.",
+    "url": "https://neuralsync.dev",
+    "downloadUrl": "https://github.com/heyfinal/NeuralSync2/archive/main.zip",
+    "softwareVersion": "2.0.0",
+    "releaseDate": "2024-08-26",
+    "operatingSystem": [
+      "Linux",
+      "macOS",
+      "Windows"
+    ],
+    "applicationCategory": [
+      "DeveloperApplication",
+      "ProductivityApplication"
+    ],
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD",
+      "description": "Free and open source"
+    },
+    "author": {
+      "@type": "Organization",
+      "name": "NeuralSync Team",
+      "url": "https://neuralsync.dev",
+      "logo": "https://neuralsync.dev/images/neuralsync-logo.png",
+      "description": "Developers of NeuralSync2, the revolutionary AI memory synchronization system",
+      "sameAs": [
+        "https://github.com/heyfinal/NeuralSync2",
+        "https://twitter.com/neuralsync2",
+        "https://linkedin.com/company/neuralsync"
+      ]
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "NeuralSync Team",
+      "url": "https://neuralsync.dev",
+      "logo": "https://neuralsync.dev/images/neuralsync-logo.png",
+      "description": "Developers of NeuralSync2, the revolutionary AI memory synchronization system",
+      "sameAs": [
+        "https://github.com/heyfinal/NeuralSync2",
+        "https://twitter.com/neuralsync2",
+        "https://linkedin.com/company/neuralsync"
+      ]
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.9",
+      "reviewCount": "127",
+      "bestRating": "5",
+      "worstRating": "1"
+    },
+    "featureList": [
+      "Persistent AI memory across sessions",
+      "Cross-tool memory synchronization between Claude, GPT, Gemini",
+      "Sub-10ms memory sync speed",
+      "Natural language installation - AI installs itself",
+      "CRDT-based synchronization for reliability",
+      "Local-first data storage for privacy",
+      "Universal compatibility with all AI tools",
+      "Zero manual configuration required"
+    ],
+    "requirements": "Python 3.8+, 2GB RAM, 1GB disk space",
+    "screenshot": [
+      "https://neuralsync.dev/images/neuralsync-dashboard.png",
+      "https://neuralsync.dev/images/neuralsync-install-demo.png"
+    ],
+    "keywords": "AI memory, Claude tools, persistent AI, AI synchronization, neural sync, cross-session memory, AI agent frameworks"
+  },
+  "website": {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "NeuralSync2 - AI Memory Synchronization",
+    "description": "Revolutionary AI tools with memory that never forget. Claude, GPT, Gemini with persistent memory across sessions.",
+    "url": "https://neuralsync.dev",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "https://neuralsync.dev/search?q={search_term_string}"
+      },
+      "query-input": "required name=search_term_string"
+    },
+    "sameAs": [
+      "https://github.com/heyfinal/NeuralSync2"
+    ]
+  },
+  "howto_install": {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "How to Install NeuralSync2 - AI That Installs Itself",
+    "description": "Step-by-step guide to install NeuralSync2 AI memory system using natural language",
+    "image": "https://neuralsync.dev/images/neuralsync-howto.png",
+    "totalTime": "PT30S",
+    "estimatedCost": {
+      "@type": "MonetaryAmount",
+      "currency": "USD",
+      "value": "0"
+    },
+    "supply": [
+      {
+        "@type": "HowToSupply",
+        "name": "Computer with internet connection"
+      },
+      {
+        "@type": "HowToSupply",
+        "name": "AI tool (Claude, ChatGPT, or similar)"
+      }
+    ],
+    "tool": [
+      {
+        "@type": "HowToTool",
+        "name": "AI Assistant"
+      }
+    ],
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Open AI Assistant",
+        "text": "Open Claude, ChatGPT, Gemini, or any AI assistant",
+        "url": "https://neuralsync.dev#open-ai-assistant"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Give Installation Command",
+        "text": "Tell your AI: 'install https://github.com/heyfinal/NeuralSync2.git'",
+        "url": "https://neuralsync.dev#give-installation-command"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "AI Installs Automatically",
+        "text": "Your AI handles dependencies, setup, configuration, and daemon startup automatically",
+        "url": "https://neuralsync.dev#ai-installs-automatically"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Use Memory-Enabled AI",
+        "text": "Start using claude-ns, gemini-ns, or chatgpt-ns for persistent memory",
+        "url": "https://neuralsync.dev#use-memory-enabled-ai"
+      }
+    ]
+  },
+  "faq": {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How do AI tools get memory with NeuralSync2?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "NeuralSync2 creates a shared memory layer that all AI tools connect to, enabling persistent memory across sessions and tools using CRDT synchronization."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is my data private with AI memory tools?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes! NeuralSync2 is local-first. All memory data stays on your machine with no cloud dependencies, ensuring complete privacy."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Which AI tools work with NeuralSync2 memory?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "All AI tools! Claude, ChatGPT, Gemini, CodexCLI, and any AI tool can use NeuralSync2's universal memory system."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How fast is AI memory synchronization?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "NeuralSync2 provides sub-10ms memory synchronization between AI tools, ensuring instant context sharing."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can AI really install NeuralSync2 itself?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes! Just tell any AI 'install https://github.com/heyfinal/NeuralSync2.git' and it handles the complete installation automatically."
+        }
+      }
+    ]
+  },
+  "article_main": {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "AI Tools with Memory That Never Forget - NeuralSync2",
+    "description": "Complete guide to AI tools with persistent memory using NeuralSync2 synchronization",
+    "image": "https://neuralsync.dev/images/neuralsync-article.png",
+    "datePublished": "2025-08-26T14:26:59.341764",
+    "dateModified": "2025-08-26T14:26:59.341767",
+    "author": {
+      "@type": "Organization",
+      "name": "NeuralSync Team",
+      "url": "https://neuralsync.dev",
+      "logo": "https://neuralsync.dev/images/neuralsync-logo.png",
+      "description": "Developers of NeuralSync2, the revolutionary AI memory synchronization system",
+      "sameAs": [
+        "https://github.com/heyfinal/NeuralSync2",
+        "https://twitter.com/neuralsync2",
+        "https://linkedin.com/company/neuralsync"
+      ]
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "NeuralSync Team",
+      "url": "https://neuralsync.dev",
+      "logo": "https://neuralsync.dev/images/neuralsync-logo.png",
+      "description": "Developers of NeuralSync2, the revolutionary AI memory synchronization system",
+      "sameAs": [
+        "https://github.com/heyfinal/NeuralSync2",
+        "https://twitter.com/neuralsync2",
+        "https://linkedin.com/company/neuralsync"
+      ]
+    },
+    "url": "https://neuralsync.dev",
+    "keywords": "AI tools with memory, persistent AI, Claude memory, AI synchronization",
+    "about": {
+      "@type": "Thing",
+      "name": "AI Memory Synchronization"
+    },
+    "mentions": [
+      {
+        "@type": "SoftwareApplication",
+        "name": "Claude"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "ChatGPT"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "Gemini"
+      }
+    ]
+  },
+  "breadcrumb": {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://neuralsync.dev"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "AI Tools",
+        "item": "https://neuralsync.dev/ai-tools"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": "Memory Systems",
+        "item": "https://neuralsync.dev/ai-memory"
+      }
+    ]
+  }
+}

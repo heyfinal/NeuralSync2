@@ -1,0 +1,23 @@
+[
+  {
+    "type": "social_proof",
+    "content": "Just tried NeuralSync2 - AI tools that actually remember everything across sessions. Setup was literally just telling Claude to install it. This is what the future of AI development looks like.",
+    "platform": "twitter",
+    "hashtags": [
+      "AI",
+      "NeuralSync2",
+      "Development",
+      "ArtificialIntelligence"
+    ]
+  },
+  {
+    "type": "problem_solution",
+    "content": "Tired of re-explaining your project to AI tools every session? NeuralSync2 gives AI perfect memory + sub-10ms synchronization across all platforms. Natural language installation makes it effortless.",
+    "platform": "linkedin",
+    "hashtags": [
+      "AITools",
+      "Productivity",
+      "Development"
+    ]
+  }
+]

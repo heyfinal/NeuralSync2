@@ -1,0 +1,30 @@
+{
+  "measurement_id": "G-XXXXXXXXXX",
+  "property_id": "XXXXXXXXXX",
+  "integration_date": "2025-08-26T14:34:36.815568",
+  "events_tracking": {
+    "page_views": true,
+    "scroll_tracking": true,
+    "outbound_clicks": true,
+    "file_downloads": true,
+    "github_clicks": true
+  },
+  "goals": [
+    {
+      "name": "GitHub Repository Visit",
+      "type": "destination",
+      "url": "/github"
+    },
+    {
+      "name": "Installation Command Copy",
+      "type": "event",
+      "category": "engagement",
+      "action": "copy_install_command"
+    },
+    {
+      "name": "Documentation View",
+      "type": "destination",
+      "url": "/docs"
+    }
+  ]
+}

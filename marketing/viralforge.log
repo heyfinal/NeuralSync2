@@ -1,0 +1,12 @@
+2025-08-26 14:06:39,576 - ViralForge - INFO - Starting viral campaign: NeuralSync2_Viral_Launch
+2025-08-26 14:06:39,576 - ViralForge - INFO - Generated 0 viral content pieces
+2025-08-26 14:06:39,576 - ViralForge - INFO - Optimized 0 pieces for discovery
+2025-08-26 14:06:39,576 - ViralForge - INFO - Created 0 technical showcases
+2025-08-26 14:06:39,576 - ViralForge - INFO - Seeded 0 community discovery points
+2025-08-26 14:06:39,576 - ViralForge - INFO - Created 0 influencer magnets
+2025-08-26 14:06:39,576 - ViralForge - INFO - Viral Metrics - Stars: 174479566675033968420764250013696, Discovery Rate: 0.00, Viral Coefficient: 0.00
+2025-08-26 14:06:39,576 - ViralForge - INFO - Viral Metrics - Stars: 174479566686918139175063552786432, Discovery Rate: 0.00, Viral Coefficient: 0.00
+2025-08-26 14:06:39,576 - ViralForge - INFO - Increased content generation frequency
+2025-08-26 14:08:46,954 - ViralForge - ERROR - Keyword extraction error: 'numpy.float64' object has no attribute 'split'
+2025-08-26 14:08:46,954 - ViralForge - ERROR - Discovery score calculation error: list index out of range
+2025-08-26 14:08:56,764 - ViralForge - INFO - GitHub seeding: 16 items created

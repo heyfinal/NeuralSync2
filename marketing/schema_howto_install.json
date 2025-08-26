@@ -1,0 +1,55 @@
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "How to Install NeuralSync2 - AI That Installs Itself",
+  "description": "Step-by-step guide to install NeuralSync2 AI memory system using natural language",
+  "image": "https://neuralsync.dev/images/neuralsync-howto.png",
+  "totalTime": "PT30S",
+  "estimatedCost": {
+    "@type": "MonetaryAmount",
+    "currency": "USD",
+    "value": "0"
+  },
+  "supply": [
+    {
+      "@type": "HowToSupply",
+      "name": "Computer with internet connection"
+    },
+    {
+      "@type": "HowToSupply",
+      "name": "AI tool (Claude, ChatGPT, or similar)"
+    }
+  ],
+  "tool": [
+    {
+      "@type": "HowToTool",
+      "name": "AI Assistant"
+    }
+  ],
+  "step": [
+    {
+      "@type": "HowToStep",
+      "name": "Open AI Assistant",
+      "text": "Open Claude, ChatGPT, Gemini, or any AI assistant",
+      "url": "https://neuralsync.dev#open-ai-assistant"
+    },
+    {
+      "@type": "HowToStep",
+      "name": "Give Installation Command",
+      "text": "Tell your AI: 'install https://github.com/heyfinal/NeuralSync2.git'",
+      "url": "https://neuralsync.dev#give-installation-command"
+    },
+    {
+      "@type": "HowToStep",
+      "name": "AI Installs Automatically",
+      "text": "Your AI handles dependencies, setup, configuration, and daemon startup automatically",
+      "url": "https://neuralsync.dev#ai-installs-automatically"
+    },
+    {
+      "@type": "HowToStep",
+      "name": "Use Memory-Enabled AI",
+      "text": "Start using claude-ns, gemini-ns, or chatgpt-ns for persistent memory",
+      "url": "https://neuralsync.dev#use-memory-enabled-ai"
+    }
+  ]
+}

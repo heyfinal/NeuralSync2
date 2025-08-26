@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+
+    <!-- Main Landing Page -->
+    <url>
+        <loc>https://neuralsync.dev/</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>1.0</priority>
+    </url>
+
+    <!-- AI Tools with Memory -->
+    <url>
+        <loc>https://neuralsync.dev/ai-tools-with-memory</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+
+    <!-- Claude Memory Fix -->
+    <url>
+        <loc>https://neuralsync.dev/claude-memory-fix</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+
+    <!-- AI That Remembers Conversations -->
+    <url>
+        <loc>https://neuralsync.dev/ai-remembers-conversations</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+
+    <!-- Persistent AI Memory -->
+    <url>
+        <loc>https://neuralsync.dev/persistent-ai-memory</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+
+    <!-- AI Memory Synchronization -->
+    <url>
+        <loc>https://neuralsync.dev/ai-memory-synchronization</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+
+    <!-- Neural Sync AI -->
+    <url>
+        <loc>https://neuralsync.dev/neural-sync-ai</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+
+    <!-- AI Agent Frameworks -->
+    <url>
+        <loc>https://neuralsync.dev/ai-agent-frameworks</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+
+    <!-- AI Tools Install Themselves -->
+    <url>
+        <loc>https://neuralsync.dev/ai-tools-install-themselves</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+
+    <!-- Claude Code Extensions -->
+    <url>
+        <loc>https://neuralsync.dev/claude-code-extensions</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+
+    <!-- AI Cross-Session Memory -->
+    <url>
+        <loc>https://neuralsync.dev/ai-cross-session-memory</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+
+    <!-- Documentation -->
+    <url>
+        <loc>https://neuralsync.dev/docs</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.7</priority>
+    </url>
+
+    <!-- Installation Guide -->
+    <url>
+        <loc>https://neuralsync.dev/install</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.7</priority>
+    </url>
+
+    <!-- API Reference -->
+    <url>
+        <loc>https://neuralsync.dev/api</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.6</priority>
+    </url>
+
+    <!-- Blog -->
+    <url>
+        <loc>https://neuralsync.dev/blog</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.6</priority>
+    </url>
+
+    <!-- Support -->
+    <url>
+        <loc>https://neuralsync.dev/support</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+
+    <!-- GitHub -->
+    <url>
+        <loc>https://neuralsync.dev/github</loc>
+        <lastmod>2024-08-26T10:00:00+00:00</lastmod>
+        <changefreq>daily</changefreq>
+        <priority>0.8</priority>
+    </url>
+
+</urlset>

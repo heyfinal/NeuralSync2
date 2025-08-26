@@ -1,0 +1,9 @@
+{
+  "site_url": "https://neuralsync.dev",
+  "verification_method": "html_file",
+  "sitemap_urls": [
+    "https://neuralsync.dev/sitemap.xml"
+  ],
+  "geo_targeting": "worldwide",
+  "setup_date": "2025-08-26T14:34:36.815568"
+}
