@@ -10,35 +10,48 @@ NS = os.environ.get("NS_ENDPOINT", f"http://{os.environ.get('NS_HOST','127.0.0.1
 HEAD = {"Authorization": f"Bearer {os.environ['NS_TOKEN']}"} if os.environ.get("NS_TOKEN") else {}
 
 def ensure_neuralsync_running():
-    """Ensure NeuralSync services are running before proceeding"""
+    """Fast NeuralSync connectivity check"""
+    try:
+        # Quick health check first
+        response = requests.get(f"{NS}/health", headers=HEAD, timeout=1)
+        if response.status_code == 200:
+            return True
+    except:
+        pass
+    
+    # If health check fails, try daemon manager (but don't wait long)
     try:
         from neuralsync.enhanced_daemon_manager import ensure_neuralsync_running_enhanced
-        return asyncio.run(ensure_neuralsync_running_enhanced())
-    except ImportError:
-        # Fallback to original daemon manager
+        return asyncio.wait_for(ensure_neuralsync_running_enhanced(), timeout=3)
+    except (ImportError, asyncio.TimeoutError):
         try:
             from neuralsync.daemon_manager import ensure_neuralsync_running
-            return asyncio.run(ensure_neuralsync_running())
-        except ImportError:
-            # No daemon manager available, just try to connect
-            pass
-    
-    # Basic connectivity check
-    try:
-        response = requests.get(f"{NS}/health", headers=HEAD, timeout=2)
-        return response.status_code == 200
-    except:
-        return False
+            return asyncio.wait_for(ensure_neuralsync_running(), timeout=3)
+        except (ImportError, asyncio.TimeoutError):
+            return False
 
 def get_preamble(tool: Optional[str]):
-    persona = requests.get(f"{NS}/persona", headers=HEAD, timeout=5).json().get("text","")
-    recall = requests.post(f"{NS}/recall", headers=HEAD, json={"query":"", "top_k":8, "scope":"any", "tool":tool}, timeout=10).json()
-    pre = []
-    if persona:
-        pre += [f"Persona: {persona}", ""]
-    for i,it in enumerate(recall.get("items",[]),1):
-        pre.append(f"[M{i}] ({it.get('kind')},{it.get('scope')},conf={it.get('confidence','')}) {it.get('text','')}")
-    return "\n".join(pre)+("\n\n" if pre else "")
+    """Optimized context retrieval with faster timeouts and minimal data"""
+    try:
+        # Fast persona check with short timeout
+        persona_response = requests.get(f"{NS}/persona", headers=HEAD, timeout=1)
+        persona = persona_response.json().get("text","") if persona_response.status_code == 200 else ""
+        
+        # Quick recall with reduced items and short timeout
+        recall_response = requests.post(f"{NS}/recall", headers=HEAD, 
+                                      json={"query":"", "top_k":3, "scope":"any", "tool":tool}, 
+                                      timeout=2)
+        recall = recall_response.json() if recall_response.status_code == 200 else {"items": []}
+        
+        pre = []
+        if persona:
+            pre += [f"Persona: {persona}", ""]
+        for i,it in enumerate(recall.get("items",[]),1):
+            pre.append(f"[M{i}] ({it.get('kind')},{it.get('scope')},conf={it.get('confidence','')}) {it.get('text','')}")
+        return "\n".join(pre)+("\n\n" if pre else "")
+    except:
+        # If NeuralSync is unavailable, continue without context
+        return ""
 
 def send_remember(line: str):
     try:

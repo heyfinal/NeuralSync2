@@ -1,0 +1,427 @@
+#!/usr/bin/env python3
+"""
+Optimized NeuralSync Wrapper (nswrap) v2.0
+High-performance CLI integration with sub-second response times
+"""
+
+import os
+import sys
+import shlex
+import subprocess
+import asyncio
+import time
+import logging
+from typing import Optional, Dict, Any
+from pathlib import Path
+
+# Add neuralsync to path for imports
+sys.path.insert(0, str(Path(__file__).parent))
+
+# Configure logging for performance monitoring
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
+
+# Environment configuration
+NS_HOST = os.environ.get('NS_HOST', '127.0.0.1')
+NS_PORT = os.environ.get('NS_PORT', '8373')
+NS_TOKEN = os.environ.get('NS_TOKEN')
+NS_ENDPOINT = os.environ.get("NS_ENDPOINT", f"http://{NS_HOST}:{NS_PORT}")
+
+# Performance mode configuration
+FAST_MODE = os.environ.get('NS_FAST_MODE', '1').lower() in ('1', 'true', 'yes')
+BYPASS_MODE = os.environ.get('NS_BYPASS_MODE', '0').lower() in ('1', 'true', 'yes')
+PRELOAD_CONTEXT = os.environ.get('NS_PRELOAD', '1').lower() in ('1', 'true', 'yes')
+MAX_CONTEXT_WAIT_MS = int(os.environ.get('NS_MAX_WAIT_MS', '800'))  # 800ms max wait
+
+# Global performance tracker
+performance_stats = {
+    'total_calls': 0,
+    'context_fetches': 0,
+    'cache_hits': 0,
+    'avg_response_time_ms': 0.0,
+    'bypass_mode_used': 0
+}
+
+async def ensure_neuralsync_available() -> bool:
+    """Fast NeuralSync availability check with timeout"""
+    try:
+        from neuralsync.async_network import ensure_service_available
+        return await asyncio.wait_for(
+            ensure_service_available(NS_ENDPOINT), 
+            timeout=1.0
+        )
+    except (ImportError, asyncio.TimeoutError, Exception):
+        # Fallback to basic HTTP check
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{NS_ENDPOINT}/health", timeout=aiohttp.ClientTimeout(total=0.5)) as response:
+                    return response.status == 200
+        except Exception:
+            return False
+
+async def get_context_optimized(tool: Optional[str], query: str = "") -> str:
+    """Get context with maximum performance optimizations"""
+    global performance_stats
+    
+    start_time = time.perf_counter()
+    context = ""
+    
+    try:
+        # Import optimization modules
+        from neuralsync.async_network import fetch_context_optimized
+        from neuralsync.context_prewarmer import record_cli_usage
+        
+        # Record usage for learning
+        if PRELOAD_CONTEXT:
+            record_cli_usage(tool, query)
+        
+        # Fetch context with timeout
+        context = await asyncio.wait_for(
+            fetch_context_optimized(tool, query),
+            timeout=MAX_CONTEXT_WAIT_MS / 1000.0
+        )
+        
+        performance_stats['context_fetches'] += 1
+        if context:
+            performance_stats['cache_hits'] += 1
+            
+    except asyncio.TimeoutError:
+        logger.warning(f"Context fetch timeout after {MAX_CONTEXT_WAIT_MS}ms")
+        context = ""
+    except ImportError:
+        # Fallback to legacy method
+        context = await get_context_legacy(tool, query)
+    except Exception as e:
+        logger.debug(f"Optimized context fetch failed: {e}")
+        context = ""
+    
+    # Update performance statistics
+    fetch_time_ms = (time.perf_counter() - start_time) * 1000
+    performance_stats['avg_response_time_ms'] = (
+        0.9 * performance_stats['avg_response_time_ms'] + 0.1 * fetch_time_ms
+    )
+    
+    return context
+
+async def get_context_legacy(tool: Optional[str], query: str = "") -> str:
+    """Legacy context fetching as fallback"""
+    try:
+        import aiohttp
+        
+        headers = {}
+        if NS_TOKEN:
+            headers['Authorization'] = f'Bearer {NS_TOKEN}'
+        
+        timeout = aiohttp.ClientTimeout(total=1.0)
+        
+        async with aiohttp.ClientSession() as session:
+            # Parallel requests for persona and memory
+            tasks = []
+            
+            # Persona request
+            persona_task = session.get(f"{NS_ENDPOINT}/persona", headers=headers, timeout=timeout)
+            tasks.append(('persona', persona_task))
+            
+            # Memory recall request
+            if query or not FAST_MODE:
+                recall_data = {
+                    "query": query,
+                    "top_k": 2 if FAST_MODE else 3,
+                    "scope": "any",
+                    "tool": tool
+                }
+                memory_task = session.post(f"{NS_ENDPOINT}/recall", headers=headers, 
+                                         json=recall_data, timeout=timeout)
+                tasks.append(('memory', memory_task))
+            
+            # Execute requests in parallel
+            context_parts = []
+            
+            if tasks:
+                responses = await asyncio.gather(
+                    *[task for _, task in tasks], 
+                    return_exceptions=True
+                )
+                
+                for i, ((request_type, _), response) in enumerate(zip(tasks, responses)):
+                    if isinstance(response, Exception):
+                        continue
+                        
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        if request_type == 'persona' and not FAST_MODE:
+                            persona_text = data.get('text', '')
+                            if persona_text:
+                                context_parts.append(f"Persona: {persona_text}")
+                                context_parts.append("")
+                        
+                        elif request_type == 'memory':
+                            items = data.get('items', [])
+                            for j, item in enumerate(items, 1):
+                                context_line = f"[M{j}] ({item.get('kind', 'unknown')},{item.get('scope', 'global')},conf={item.get('confidence', '')})"
+                                context_line += f" {item.get('text', '')}"
+                                context_parts.append(context_line)
+            
+            result = "\n".join(context_parts)
+            return result + ("\n\n" if result else "")
+            
+    except Exception as e:
+        logger.debug(f"Legacy context fetch failed: {e}")
+        return ""
+
+async def send_remember_optimized(text: str) -> bool:
+    """Send remember command with optimization"""
+    try:
+        from neuralsync.async_network import get_network_client
+        
+        client = get_network_client(fast_mode=True)
+        return await client.send_remember(text)
+        
+    except ImportError:
+        # Fallback to legacy method
+        return await send_remember_legacy(text)
+    except Exception as e:
+        logger.debug(f"Optimized remember failed: {e}")
+        return False
+
+async def send_remember_legacy(text: str) -> bool:
+    """Legacy remember functionality"""
+    try:
+        import aiohttp
+        
+        headers = {'Content-Type': 'application/json'}
+        if NS_TOKEN:
+            headers['Authorization'] = f'Bearer {NS_TOKEN}'
+        
+        payload = {
+            "text": text,
+            "kind": "note",
+            "scope": "global",
+            "tool": os.environ.get("TOOL_NAME"),
+            "tags": [],
+            "confidence": 0.8,
+            "source": "nswrap"
+        }
+        
+        timeout = aiohttp.ClientTimeout(total=2.0)
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(f"{NS_ENDPOINT}/remember", 
+                                  headers=headers, json=payload, timeout=timeout) as response:
+                return response.status == 200
+                
+    except Exception as e:
+        logger.debug(f"Legacy remember failed: {e}")
+        return False
+
+def parse_remember_line(line: str) -> Optional[str]:
+    """Parse @remember: command from output"""
+    if not line.startswith("@remember:"):
+        return None
+    
+    try:
+        rest = line[len("@remember:"):].strip()
+        parts = shlex.split(rest)
+        
+        text_parts = []
+        for part in parts:
+            if "=" in part and len(text_parts) == 0:
+                # Skip key=value pairs at the beginning
+                continue
+            else:
+                text_parts.append(part)
+        
+        if text_parts:
+            return " ".join(text_parts).strip('"')
+        
+        return None
+        
+    except Exception as e:
+        logger.debug(f"Remember line parsing failed: {e}")
+        return None
+
+async def main_async():
+    """Main async execution"""
+    global performance_stats
+    
+    start_time = time.perf_counter()
+    performance_stats['total_calls'] += 1
+    
+    # Parse command line arguments
+    if "--" in sys.argv:
+        idx = sys.argv.index("--")
+        command = sys.argv[idx+1:]
+        tool = os.environ.get("TOOL_NAME")
+    else:
+        if len(sys.argv) == 1:
+            print("Usage: nswrap -- <command> [args...]")
+            print("Environment: Set TOOL_NAME to identify tool context")
+            print(f"Performance: {performance_stats}")
+            sys.exit(0)
+        command = sys.argv[1:]
+        tool = os.environ.get("TOOL_NAME")
+    
+    # Skip context for help commands or bypass mode
+    skip_context = (BYPASS_MODE or 
+                   len(command) > 0 and command[0] in ['--help', '--version', '-h', '-v'])
+    
+    # Get context if needed
+    context = ""
+    if not skip_context and tool:
+        try:
+            # Check service availability first
+            service_available = await ensure_neuralsync_available()
+            if service_available:
+                context = await get_context_optimized(tool)
+            else:
+                logger.debug("NeuralSync service not available, skipping context")
+                
+        except Exception as e:
+            logger.debug(f"Context fetching failed: {e}")
+    
+    if skip_context:
+        performance_stats['bypass_mode_used'] += 1
+    
+    # Handle stdin efficiently
+    user_input = ""
+    if not sys.stdin.isatty():
+        try:
+            import select
+            if select.select([sys.stdin], [], [], 0.05)[0]:  # 50ms timeout
+                user_input = sys.stdin.read()
+        except (ImportError, OSError):
+            # Fallback for Windows or other platforms
+            pass
+    
+    # Prepare input for subprocess
+    subprocess_input = context + user_input
+    
+    # Execute command
+    try:
+        process = subprocess.Popen(
+            command, 
+            stdin=subprocess.PIPE, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.STDOUT, 
+            text=True
+        )
+        
+        output, _ = process.communicate(input=subprocess_input)
+        
+        # Process output and handle @remember commands
+        remember_tasks = []
+        
+        for line in output.splitlines():
+            print(line)
+            
+            # Handle @remember commands asynchronously
+            remember_text = parse_remember_line(line)
+            if remember_text:
+                remember_task = asyncio.create_task(send_remember_optimized(remember_text))
+                remember_tasks.append(remember_task)
+        
+        # Wait for remember commands to complete (but don't block exit)
+        if remember_tasks:
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*remember_tasks, return_exceptions=True),
+                    timeout=1.0
+                )
+            except asyncio.TimeoutError:
+                logger.debug("Remember commands timed out")
+        
+        # Update final performance stats
+        total_time_ms = (time.perf_counter() - start_time) * 1000
+        
+        if os.environ.get('NS_DEBUG_PERF'):
+            print(f"⚡ nswrap: {total_time_ms:.1f}ms total, "
+                  f"{performance_stats['avg_response_time_ms']:.1f}ms avg context, "
+                  f"{performance_stats['cache_hits']}/{performance_stats['context_fetches']} cache hits",
+                  file=sys.stderr)
+        
+        sys.exit(process.returncode)
+        
+    except FileNotFoundError:
+        print(f"nswrap: command not found: {command[0]}", file=sys.stderr)
+        sys.exit(127)
+    except Exception as e:
+        print(f"nswrap: execution error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+def main():
+    """Main entry point with performance monitoring"""
+    try:
+        # Start prewarming service if enabled
+        if PRELOAD_CONTEXT and not BYPASS_MODE:
+            try:
+                from neuralsync.context_prewarmer import get_context_prewarmer
+                prewarmer = get_context_prewarmer()
+                if not prewarmer.running:
+                    prewarmer.start()
+            except ImportError:
+                pass
+            except Exception as e:
+                logger.debug(f"Prewarming service start failed: {e}")
+        
+        # Run main async function
+        try:
+            asyncio.run(main_async())
+        except KeyboardInterrupt:
+            sys.exit(130)
+        except Exception as e:
+            logger.error(f"Async execution failed: {e}")
+            # Fallback to synchronous execution
+            main_sync_fallback()
+            
+    except Exception as e:
+        print(f"nswrap: critical error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+def main_sync_fallback():
+    """Synchronous fallback for when async fails"""
+    global performance_stats
+    
+    performance_stats['bypass_mode_used'] += 1
+    
+    # Parse arguments
+    if "--" in sys.argv:
+        idx = sys.argv.index("--")
+        command = sys.argv[idx+1:]
+    else:
+        if len(sys.argv) == 1:
+            print("Usage: nswrap -- <command> [args...]")
+            sys.exit(0)
+        command = sys.argv[1:]
+    
+    # Execute without context
+    try:
+        user_input = ""
+        if not sys.stdin.isatty():
+            try:
+                user_input = sys.stdin.read()
+            except:
+                pass
+        
+        process = subprocess.Popen(
+            command, 
+            stdin=subprocess.PIPE, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.STDOUT, 
+            text=True
+        )
+        
+        output, _ = process.communicate(input=user_input)
+        
+        for line in output.splitlines():
+            print(line)
+        
+        sys.exit(process.returncode)
+        
+    except Exception as e:
+        print(f"nswrap: fallback execution error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
