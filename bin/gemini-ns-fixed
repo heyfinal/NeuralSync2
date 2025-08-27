@@ -63,8 +63,8 @@ if [ "$BYPASS_CONTEXT" -eq 1 ]; then
 else
     # Execute through NeuralSync wrapper
     if [ -n "${FILTERED_ARGS[*]}" ]; then
-        exec "${NEURALSYNC_DIR}/nswrap" -- "$GEMINI_CMD" "${FILTERED_ARGS[@]}"
+        exec "${SCRIPT_DIR}/nswrap" -- "$GEMINI_CMD" "${FILTERED_ARGS[@]}"
     else
-        exec "${NEURALSYNC_DIR}/nswrap" -- "$GEMINI_CMD"
+        exec "${SCRIPT_DIR}/nswrap" -- "$GEMINI_CMD"
     fi
 fi

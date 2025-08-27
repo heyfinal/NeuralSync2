@@ -62,9 +62,10 @@ if [ "$BYPASS_CONTEXT" -eq 1 ]; then
     exec "$CLAUDE_CMD" "${FILTERED_ARGS[@]}"
 else
     # Execute through NeuralSync wrapper
+    NSWRAP_PATH="${SCRIPT_DIR}/nswrap"
     if [ -n "${FILTERED_ARGS[*]}" ]; then
-        exec "${NEURALSYNC_DIR}/nswrap" -- "$CLAUDE_CMD" "${FILTERED_ARGS[@]}"
+        exec "$NSWRAP_PATH" -- "$CLAUDE_CMD" "${FILTERED_ARGS[@]}"
     else
-        exec "${NEURALSYNC_DIR}/nswrap" -- "$CLAUDE_CMD"
+        exec "$NSWRAP_PATH" -- "$CLAUDE_CMD"
     fi
 fi
