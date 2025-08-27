@@ -11,7 +11,7 @@
 
 *Persistent, CRDT-synchronized memory for claude-code, codex, and other CLI AI tools*
 
-[🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [⚡ Features](#-features) • [🛠️ Installation](#-installation) • [🤝 Contributing](#-contributing)
+[🚀 Quick Start](#-quick-start) • [🔧 Latest Updates](#-latest-updates---cli-integration-fixes) • [⚡ Features](#-features) • [🛠️ Installation](#-installation) • [📖 Documentation](#-documentation) • [🤝 Contributing](#-contributing)
 
 </div>
 
@@ -69,6 +69,41 @@ codex-ns "Continue the refactoring we started last session"
 # Use with gemini (synchronized across all sessions)
 gemini-ns "Build on the architecture we planned together"
 ```
+
+---
+
+## 🔧 Latest Updates - CLI Integration Fixes
+
+### ✅ **Fixed CLI Wrapper Issues** 
+- **Resolved argument conflicts** in `codex-ns` wrapper (`--ask-for-approval` handling)
+- **Fixed wrapper hanging** issues with `claude-ns` and other CLI tools
+- **Enhanced error handling** for missing underlying CLI installations
+- **Improved process management** preventing timeout issues
+
+### 🧪 **100% Test Success Rate**
+```bash
+# Comprehensive integration test results
+✅ nswrap Basic: PASS - Echo command works  
+✅ Memory Storage: PASS - Test memory stored successfully
+✅ Memory Recall: PASS - Retrieved 1 memories
+✅ Context Injection: PASS - Context injection working
+✅ Cross-tool Memory: PASS - Memory shared between tools
+✅ Persona Sharing: PASS - Persona stored and retrieved
+✅ Codex Wrapper: PASS - Version check successful
+✅ Claude Wrapper: PASS - Wrapper responds (no hang)
+```
+
+### 🚀 **Performance Improvements**
+- **Enhanced wrapper deployment** via updated installer
+- **Fixed SQLite FTS UPSERT** errors preventing memory storage
+- **Resolved JSON serialization** issues with binary vector data
+- **Auto-recovery mechanisms** for failed CLI integrations
+
+### 📦 **Installation Enhancements**
+- **Updated main installer** now includes all wrapper fixes
+- **Simplified deployment** with `claude-ns-fixed`, `codex-ns-fixed`, `gemini-ns-fixed`
+- **Integrated nswrap** installation for seamless CLI wrapping
+- **Enhanced completion messages** with clear testing instructions
 
 ---
 

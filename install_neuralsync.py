@@ -430,9 +430,9 @@ class NeuralSyncInstaller:
         print("🔧 Installing wrapper scripts...")
         
         wrapper_scripts = [
-            ('bin/claude-ns', 'claude-ns'),
-            ('bin/codex-ns', 'codex-ns'),
-            ('bin/gemini-ns', 'gemini-ns')
+            ('bin/claude-ns-fixed', 'claude-ns'),
+            ('bin/codex-ns-fixed', 'codex-ns'),
+            ('bin/gemini-ns-fixed', 'gemini-ns')
         ]
         
         for source_path, script_name in wrapper_scripts:
@@ -452,6 +452,21 @@ class NeuralSyncInstaller:
                 print(f"❌ Failed to install {script_name}: {e}")
                 return False
                 
+        # Install nswrap
+        nswrap_source = self.install_dir / "nswrap"
+        nswrap_target = self.bin_dir / "nswrap"
+        
+        if nswrap_source.exists():
+            try:
+                shutil.copy2(nswrap_source, nswrap_target)
+                nswrap_target.chmod(nswrap_target.stat().st_mode | stat.S_IEXEC)
+                print(f"✅ Installed nswrap")
+            except Exception as e:
+                print(f"❌ Failed to install nswrap: {e}")
+                return False
+        else:
+            print(f"❌ nswrap not found at {nswrap_source}")
+            
         print("✅ Wrapper scripts installed")
         return True
         
@@ -807,8 +822,9 @@ except Exception as e:
             print()
         print("🎯 Next steps:")
         print("  1. Restart terminal or reload shell profile")
-        print("  2. Test: claude-ns --neuralsync-status")
-        print("  3. Start using: claude-ns, codex-ns, gemini-ns")
+        print("  2. Test: claude-ns --version")
+        print("  3. Verify status: claude-ns --neuralsync-status")
+        print("  4. Start using: claude-ns, codex-ns, gemini-ns")
         print()
         print("="*80)
         
