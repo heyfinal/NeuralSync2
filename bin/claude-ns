@@ -1,584 +1,75 @@
-#!/usr/bin/env python3
-"""
-claude-ns: Claude Code + NeuralSync Integration Wrapper
-Auto-launch, shared memory, and inter-agent communication
-"""
+#!/usr/bin/env bash
+# NeuralSync-enhanced Claude Code CLI wrapper
+# Provides shared memory context from NeuralSync to Claude Code
 
-import asyncio
-import os
-import sys
-import json
-import time
-import subprocess
-import signal
-import logging
-from pathlib import Path
-from typing import Optional, Dict, Any, List
-import tempfile
-import shutil
+set -euo pipefail
 
-# Add NeuralSync to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Get script directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+NEURALSYNC_DIR="$( cd "${SCRIPT_DIR}/.." && pwd )"
 
-from neuralsync.daemon_manager import ensure_neuralsync_running, get_daemon_manager
-from neuralsync.ultra_comm import CliCommunicator
-from neuralsync.config import load_config
+# Set environment for NeuralSync integration
+export TOOL_NAME="claude-code"
+export NS_HOST="${NS_HOST:-127.0.0.1}"
+export NS_PORT="${NS_PORT:-8373}"
 
-# Configure logging
-logging.basicConfig(
-    level=logging.WARNING,  # Keep quiet unless there are issues
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Handle special cases for claude arguments
+FILTERED_ARGS=()
+CONTEXT_MODE="full"
 
+for arg in "$@"; do
+    case "$arg" in
+        --no-context)
+            CONTEXT_MODE="none"
+            ;;
+        --minimal-context)
+            CONTEXT_MODE="minimal"
+            export NS_MINIMAL_CONTEXT="1"
+            ;;
+        *)
+            FILTERED_ARGS+=("$arg")
+            ;;
+    esac
+done
 
-class ClaudeNSWrapper:
-    """Enhanced Claude Code wrapper with NeuralSync integration"""
-    
-    def __init__(self):
-        self.cli_name = "claude-code"
-        self.capabilities = {
-            "code-generation", "analysis", "debugging", "documentation", 
-            "refactoring", "testing", "architecture-design"
-        }
-        
-        self.ns_config = load_config()
-        self.communicator: Optional[CliCommunicator] = None
-        self.temp_files = []
-        self._last_status_len = 0
+# Check if we should bypass NeuralSync context (for simple commands)
+BYPASS_CONTEXT=0
+if [ "$CONTEXT_MODE" = "none" ]; then
+    BYPASS_CONTEXT=1
+elif [ "${#FILTERED_ARGS[@]}" -eq 1 ]; then
+    case "${FILTERED_ARGS[0]}" in
+        --help|--version|-h|-v|help|version)
+            BYPASS_CONTEXT=1
+            ;;
+    esac
+fi
 
-    def _status(self, msg: str, end: bool = False):
-        try:
-            line = f"\r{msg}"
-            pad = max(0, self._last_status_len - len(msg))
-            sys.stderr.write(line + (" " * pad))
-            sys.stderr.flush()
-            self._last_status_len = len(msg)
-            if end:
-                sys.stderr.write("\n")
-                sys.stderr.flush()
-                self._last_status_len = 0
-        except Exception:
-            print(msg, file=sys.stderr)
-        
-    async def ensure_services_running(self) -> bool:
-        """Ensure NeuralSync services are running"""
-        try:
-            # Fast-path health probe to avoid unnecessary relaunches
-            try:
-                import requests
-                resp = requests.get(
-                    f"http://{self.ns_config.bind_host}:{self.ns_config.bind_port}/health",
-                    timeout=2
-                )
-                if resp.status_code == 200:
-                    return True
-            except Exception:
-                pass
-            return await ensure_neuralsync_running()
-        except Exception as e:
-            logger.error(f"Failed to ensure NeuralSync services: {e}")
-            return False
-            
-    async def setup_communication(self) -> bool:
-        """Setup inter-CLI communication"""
-        try:
-            self.communicator = CliCommunicator(self.cli_name, self.capabilities)
-            
-            # Register message handlers for inter-agent communication
-            self.communicator.register_message_handler("analyze_code", self._handle_analyze_request)
-            self.communicator.register_message_handler("review_code", self._handle_review_request)
-            self.communicator.register_message_handler("generate_docs", self._handle_docs_request)
-            self.communicator.register_message_handler("refactor_code", self._handle_refactor_request)
-            self.communicator.register_message_handler("spawn_agent", self._handle_spawn_request)
-            self.communicator.register_message_handler("sync_memory", self._handle_memory_sync)
-            
-            await self.communicator.connect()
-            logger.info("Claude-NS communication system initialized")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to setup communication: {e}")
-            return False
-            
-    async def _handle_analyze_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle code analysis request from other agents"""
-        try:
-            code = data.get('code', '')
-            context = data.get('context', '')
-            
-            # Create temp file with code
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-                f.write(code)
-                temp_file = f.name
-                self.temp_files.append(temp_file)
-            
-            # Run Claude Code analysis (simplified - in practice would use actual claude-code CLI)
-            analysis_prompt = f"""Analyze this code:
+# Find claude executable
+CLAUDE_CMD=""
+if command -v claude &> /dev/null; then
+    CLAUDE_CMD="claude"
+elif command -v claude-code &> /dev/null; then
+    CLAUDE_CMD="claude-code"
+else
+    echo "ERROR: Claude CLI not found in PATH" >&2
+    echo "Please install Claude Code CLI first" >&2
+    exit 1
+fi
 
-{code}
-
-Context: {context}
-
-Please provide:
-1. Code quality assessment
-2. Potential issues or bugs
-3. Performance considerations
-4. Security concerns
-5. Suggestions for improvement
-
-Return as structured analysis."""
-
-            # Store analysis request in NeuralSync memory
-            await self._remember_interaction("code_analysis", analysis_prompt, code[:200])
-            
-            return {
-                "status": "analyzed",
-                "file": temp_file,
-                "analysis": "Code analysis completed - check NeuralSync memory for details",
-                "agent": "claude-code",
-                "timestamp": time.time()
-            }
-            
-        except Exception as e:
-            logger.error(f"Analysis request error: {e}")
-            return {"status": "error", "message": str(e)}
-            
-    async def _handle_review_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle code review request"""
-        try:
-            files = data.get('files', [])
-            review_type = data.get('type', 'standard')
-            
-            review_results = []
-            for file_path in files:
-                if os.path.exists(file_path):
-                    with open(file_path, 'r') as f:
-                        content = f.read()
-                    
-                    # Store review context
-                    await self._remember_interaction("code_review", f"Reviewing {file_path}", content[:200])
-                    
-                    review_results.append({
-                        "file": file_path,
-                        "status": "reviewed",
-                        "issues": [],  # Would contain actual review issues
-                        "suggestions": []
-                    })
-                    
-            return {
-                "status": "reviewed",
-                "results": review_results,
-                "review_type": review_type,
-                "agent": "claude-code",
-                "timestamp": time.time()
-            }
-            
-        except Exception as e:
-            logger.error(f"Review request error: {e}")
-            return {"status": "error", "message": str(e)}
-            
-    async def _handle_docs_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle documentation generation request"""
-        try:
-            target = data.get('target', '')
-            doc_type = data.get('type', 'api')
-            
-            await self._remember_interaction("docs_generation", f"Generating {doc_type} docs for {target}", "")
-            
-            return {
-                "status": "generated",
-                "target": target,
-                "doc_type": doc_type,
-                "agent": "claude-code",
-                "timestamp": time.time()
-            }
-            
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-            
-    async def _handle_refactor_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle code refactoring request"""
-        try:
-            code = data.get('code', '')
-            refactor_type = data.get('type', 'cleanup')
-            
-            await self._remember_interaction("code_refactoring", f"Refactoring code ({refactor_type})", code[:200])
-            
-            return {
-                "status": "refactored",
-                "refactor_type": refactor_type,
-                "agent": "claude-code",
-                "timestamp": time.time()
-            }
-            
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-            
-    async def _handle_spawn_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle request to spawn another agent"""
-        try:
-            agent_type = data.get('agent', '')
-            task = data.get('task', '')
-            context = data.get('context', {})
-            
-            # Map agent types to wrapper commands
-            agent_commands = {
-                'codex': 'codex-ns',
-                'gemini': 'gemini-ns',
-                'claude': 'claude-ns'
-            }
-            
-            if agent_type not in agent_commands:
-                return {"status": "error", "message": f"Unknown agent type: {agent_type}"}
-                
-            # Spawn the agent with task
-            cmd = [agent_commands[agent_type], '--task', json.dumps({"task": task, "context": context})]
-            
-            try:
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
-                
-                # Don't wait for completion, just confirm spawn
-                await self._remember_interaction("agent_spawn", f"Spawned {agent_type} agent", task)
-                
-                return {
-                    "status": "spawned",
-                    "agent": agent_type,
-                    "pid": process.pid,
-                    "task": task,
-                    "timestamp": time.time()
-                }
-                
-            except Exception as e:
-                return {"status": "error", "message": f"Failed to spawn {agent_type}: {e}"}
-                
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-            
-    async def _handle_memory_sync(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle memory synchronization between agents"""
-        try:
-            sync_type = data.get('type', 'pull')
-            query = data.get('query', '')
-            
-            if sync_type == 'pull':
-                # Pull relevant memories
-                await self._remember_interaction("memory_sync", f"Memory pull request: {query}", "")
-                
-                return {
-                    "status": "synced",
-                    "type": "pull",
-                    "query": query,
-                    "timestamp": time.time()
-                }
-                
-            elif sync_type == 'push':
-                # Push memory to other agents
-                memory_data = data.get('memory', {})
-                await self._remember_interaction("memory_push", "Received memory from another agent", str(memory_data)[:200])
-                
-                return {
-                    "status": "synced", 
-                    "type": "push",
-                    "timestamp": time.time()
-                }
-                
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-            
-    async def _remember_interaction(self, kind: str, text: str, context: str):
-        """Store interaction in NeuralSync memory"""
-        try:
-            import requests
-            
-            headers = {}
-            if self.ns_config.token:
-                headers["Authorization"] = f"Bearer {self.ns_config.token}"
-                
-            payload = {
-                "text": text,
-                "kind": kind,
-                "scope": "inter-agent",
-                "tool": self.cli_name,
-                "tags": ["auto-generated", "inter-agent"],
-                "confidence": 0.9,
-                "source": "claude-ns",
-                "meta": {"context": context, "timestamp": time.time()}
-            }
-            
-            requests.post(
-                f"http://{self.ns_config.bind_host}:{self.ns_config.bind_port}/remember",
-                headers=headers,
-                json=payload,
-                timeout=5
-            )
-            
-        except Exception as e:
-            logger.debug(f"Failed to store memory: {e}")
-            
-    async def get_shared_context(self) -> str:
-        """Get shared persona and memory context from NeuralSync"""
-        try:
-            import requests
-            import sqlite3
-            from pathlib import Path
-            
-            headers = {}
-            if self.ns_config.token:
-                headers["Authorization"] = f"Bearer {self.ns_config.token}"
-            
-            persona = ""
-            try:
-                persona_response = requests.get(
-                    f"http://{self.ns_config.bind_host}:{self.ns_config.bind_port}/persona",
-                    headers=headers,
-                    timeout=5
-                )
-                if persona_response.status_code == 200:
-                    persona = persona_response.json().get("text", "")
-            except Exception:
-                pass
-            memory_context = ""
-            try:
-                recall_response = requests.post(
-                    f"http://{self.ns_config.bind_host}:{self.ns_config.bind_port}/recall",
-                    headers=headers,
-                    json={
-                        "query": "code analysis review refactor docs",
-                        "top_k": 8,
-                        "scope": "any", 
-                        "tool": None
-                    },
-                    timeout=10
-                )
-                if recall_response.status_code == 200:
-                    recall_data = recall_response.json()
-                    memory_context = recall_data.get("preamble", "")
-            except Exception:
-                pass
-
-            # Local DB fallback
-            if not persona or not memory_context:
-                try:
-                    db_path = Path.home()/'.neuralsync'/'memory.db'
-                    if db_path.exists():
-                        con = sqlite3.connect(str(db_path))
-                        con.row_factory = sqlite3.Row
-                        rows = con.execute(
-                            """
-                            SELECT kind, text, tool, source, created_at
-                            FROM items
-                            WHERE tombstone = 0 AND (confidence IS NULL OR confidence >= 0.6)
-                            ORDER BY created_at DESC
-                            LIMIT 12
-                            """
-                        ).fetchall()
-                        if rows and not memory_context:
-                            excerpts = []
-                            for r in rows:
-                                t = (r['text'] or '').strip()
-                                if t:
-                                    excerpts.append(f"- [{r['tool'] or r['source']}] {t[:200]}")
-                            if excerpts:
-                                memory_context = "Recent shared context:\n" + "\n".join(excerpts)
-                        con.close()
-                except Exception:
-                    pass
-            
-            # Combine context
-            context_parts = []
-            if persona:
-                context_parts.append(f"Persona: {persona}")
-            if memory_context:
-                context_parts.append(memory_context)
-                
-            return "\n\n".join(context_parts) + ("\n\n" if context_parts else "")
-            
-        except Exception as e:
-            logger.debug(f"Failed to get shared context: {e}")
-            return ""
-            
-    async def run_claude_code(self, args: List[str]) -> int:
-        """Run Claude Code with NeuralSync context injection"""
-        try:
-            # Get shared context
-            shared_context = await self.get_shared_context()
-            
-            # Find claude-code executable
-            claude_code_cmd = shutil.which('claude-code')
-            if not claude_code_cmd:
-                print("ERROR: claude-code not found in PATH", file=sys.stderr)
-                print("Please install Claude Code CLI first", file=sys.stderr)
-                return 1
-                
-            # Prepare environment with NeuralSync context
-            env = os.environ.copy()
-            env.update({
-                'NS_HOST': self.ns_config.bind_host,
-                'NS_PORT': str(self.ns_config.bind_port),
-                'NS_TOKEN': self.ns_config.token,
-                'NEURALSYNC_CONTEXT': shared_context,
-                'CLI_WRAPPER': 'claude-ns'
-            })
-            
-            # If reading from stdin, inject context (supports repair override)
-            repair_override = os.environ.get('NEURALSYNC_REPAIR_INPUT')
-            if repair_override is not None or (not args or (len(args) == 1 and args[0] in ['-', '--stdin'])):
-                input_data = repair_override if repair_override is not None else (sys.stdin.read() if not sys.stdin.isatty() else "")
-                
-                # Combine context with input
-                full_input = shared_context + input_data
-                
-                # Run claude-code with context
-                process = subprocess.Popen(
-                    [claude_code_cmd],
-                    stdin=subprocess.PIPE,
-                    stdout=sys.stdout,
-                    stderr=sys.stderr,
-                    env=env,
-                    text=True
-                )
-                
-                process.communicate(input=full_input)
-                return process.returncode
-                
-            else:
-                # Run claude-code with args and context in environment
-                process = subprocess.run(
-                    [claude_code_cmd] + args,
-                    env=env
-                )
-                return process.returncode
-                
-        except Exception as e:
-            logger.error(f"Failed to run claude-code: {e}")
-            print(f"ERROR: {e}", file=sys.stderr)
-            return 1
-            
-    def cleanup(self):
-        """Cleanup temporary files"""
-        for temp_file in self.temp_files:
-            try:
-                os.unlink(temp_file)
-            except:
-                pass
-                
-    async def run(self, args: List[str]) -> int:
-        """Main run method"""
-        try:
-            # Handle special arguments
-            if len(args) > 0:
-                if args[0] == '--neuralsync-status':
-                    manager = get_daemon_manager()
-                    status = manager.get_system_info()
-                    print(json.dumps(status, indent=2))
-                    return 0
-                    
-                elif args[0] == '--spawn-agent':
-                    if len(args) < 3:
-                        print("Usage: claude-ns --spawn-agent <agent_type> <task>", file=sys.stderr)
-                        return 1
-                        
-                    agent_type = args[1]
-                    task = ' '.join(args[2:])
-                    
-                    if self.communicator:
-                        result = await self._handle_spawn_request({
-                            'agent': agent_type,
-                            'task': task,
-                            'context': {}
-                        })
-                        print(json.dumps(result, indent=2))
-                        return 0 if result['status'] != 'error' else 1
-                        
-                elif args[0] == '--task':
-                    # Handle spawned task
-                    if len(args) > 1:
-                        try:
-                            task_data = json.loads(args[1])
-                            task = task_data.get('task', '')
-                            context = task_data.get('context', {})
-                            
-                            # Process the task with context injection
-                            await self._remember_interaction("spawned_task", f"Processing spawned task: {task}", str(context))
-                            
-                            # Create task as input to claude-code
-                            task_input = f"Task: {task}\nContext: {json.dumps(context, indent=2)}"
-                            
-                            # Run claude-code with task
-                            return await self.run_claude_code([])
-                            
-                        except json.JSONDecodeError:
-                            print("ERROR: Invalid task JSON", file=sys.stderr)
-                            return 1
-            
-            # Ensure NeuralSync services are running (single-line status)
-            self._status("NS: checking services…")
-            repair_msg = ""
-            services_ready = await self.ensure_services_running()
-            if services_ready:
-                self._status("NS: ready · linking comms…")
-                ok = await self.setup_communication()
-                if ok:
-                    self._status("NS: ready", end=True)
-                else:
-                    self._status("NS: comms failed · self-repair…", end=True)
-                    repair_msg = "NeuralSync communication setup failed. Please analyze and fix NeuralSync v2 server and wrappers so that /health, /persona, /recall work on 127.0.0.1:8373."
-            else:
-                self._status("NS: unavailable · self-repair…", end=True)
-                repair_msg = "NeuralSync services unavailable. Please restore NeuralSync v2 so wrappers can fetch persona/recall."
-
-            if repair_msg:
-                os.environ['NEURALSYNC_REPAIR_INPUT'] = (
-                    f"SYSTEM SELF-REPAIR MODE (macOS):\n"
-                    f"Issue: {repair_msg}\n"
-                    f"Constraints: minimal, focused patches; do not break APIs.\n"
-                    f"Targets: ~/NeuralSync2/neuralsync (enhanced_server.py, storage.py, research_dedup.py, daemon_manager.py).\n"
-                    f"Goals:\n- Ensure server binds to 127.0.0.1:8373 and exposes /persona,/remember,/recall.\n- Add SQLite busy_timeout and thread-safety.\n- Fix mmap resize safety.\n- Make heavy deps optional.\n- Restart server and verify /health.\n"
-                    f"Deliver: file diffs and restart steps; then verify with curl.\n"
-                )
-                self._status("NS: self-repair initiated via claude", end=True)
-                
-            # Run claude-code with NeuralSync integration
-            rc = await self.run_claude_code(args)
-            if 'NEURALSYNC_REPAIR_INPUT' in os.environ:
-                os.environ.pop('NEURALSYNC_REPAIR_INPUT', None)
-            return rc
-            
-        finally:
-            # Cleanup
-            self.cleanup()
-            if self.communicator:
-                await self.communicator.disconnect()
-
-
-async def main():
-    """Main entry point"""
-    wrapper = ClaudeNSWrapper()
-    
-    # Handle signals gracefully
-    def signal_handler(sig, frame):
-        asyncio.create_task(wrapper.communicator.disconnect() if wrapper.communicator else asyncio.sleep(0))
-        sys.exit(0)
-        
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-    
-    # Run wrapper
-    try:
-        return_code = await wrapper.run(sys.argv[1:])
-        sys.exit(return_code)
-    except KeyboardInterrupt:
-        sys.exit(0)
-    except Exception as e:
-        logger.error(f"Claude-NS wrapper error: {e}")
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+# Execute claude with or without NeuralSync context
+if [ "$BYPASS_CONTEXT" -eq 1 ]; then
+    # Direct execution without NeuralSync wrapper
+    if [ "${#FILTERED_ARGS[@]}" -gt 0 ]; then
+        exec "$CLAUDE_CMD" "${FILTERED_ARGS[@]}"
+    else
+        exec "$CLAUDE_CMD"
+    fi
+else
+    # Execute through NeuralSync wrapper
+    NSWRAP_PATH="${SCRIPT_DIR}/nswrap"
+    if [ "${#FILTERED_ARGS[@]}" -gt 0 ]; then
+        exec "$NSWRAP_PATH" -- "$CLAUDE_CMD" "${FILTERED_ARGS[@]}"
+    else
+        exec "$NSWRAP_PATH" -- "$CLAUDE_CMD"
+    fi
+fi
